@@ -38,7 +38,7 @@ Learner progression:
 
 ---
 
-## Sub‑Module Learning Objectives (Bloom’s Taxonomy Verbs)
+## Sub‑Module Learning Objectives 
 
 ### Module 1: Noob Introduction to FL  
 - **Define** federated learning; **compare** it with centralized/distributed learning.  
