@@ -21,7 +21,7 @@
 Federated Learning is a machine learning approach that enables model training across multiple decentralized devices or servers holding local data samples, without exchanging the data samples themselves. This paradigm represents a fundamental shift from traditional centralized machine learning approaches.
 
 <center>
-<img src="resources/1_what_is_fd_learning.jpg" width="400"/><br>
+<img src="FD_learning/resources/1_what_is_fd_learning.jpg" width="400"/><br>
 Figure from: https://www.linkedin.com/pulse/federated-learning-healthcare-part-1-saber-ghadakzadeh-md-msc-phd/
 <center> 
 
@@ -49,7 +49,7 @@ In classical machine learning, the process typically follows these steps:
 
 
 <center>
-<img src="resources/2_machine_learning.png" width="400"/><br>
+<img src="FD_learning/resources/2_machine_learning.png" width="400"/><br>
 Figure from: https://7wdata.be/big-data/building-the-machine-learning-infrastructure/
 <center>
 ### Federated Learning Approach
@@ -62,7 +62,7 @@ Federated Learning reverses this process:
 4. **Global Update:** The central server aggregates these updates to improve the global model
 
 <center>
-<img src="resources/3_FD_learning.ppm" width="400"/><br>
+<img src="FD_learning/resources/3_FD_learning.ppm" width="400"/><br>
 Figure from: https://www.researchgate.net/figure/The-framework-of-Federated-Learning-Graphical-illustration-of-the-working-principle-of_fig1_367191647
 <center>
 ## Challenges of Classical Machine Learning
@@ -131,7 +131,7 @@ In the healthcare sector, federated learning enables hospitals to collaborate on
 
 
 <center>
-<img src="resources/4_medical_detection.jpg" width="400"/><br>
+<img src="FD_learning/resources/4_medical_detection.jpg" width="400"/><br>
 Figure from: https://www.linkedin.com/pulse/federated-learning-healthcare-part-1-saber-ghadakzadeh-md-msc-phd/
 <center>
 
@@ -142,7 +142,7 @@ Financial institutions are leveraging federated learning for critical applicatio
 
 
 <center>
-<img src="resources/5_FD_bank.webp" width="400"/><br>
+<img src="FD_learning/resources/5_FD_bank.webp" width="400"/><br>
 Figure from: https://link.springer.com/article/10.1007/s00521-023-09410-2/figures/2
 <center>
 
@@ -153,12 +153,12 @@ In technology and IoT, federated learning has become prominent in the developmen
 
 
 <center>
-<img src="resources/7_FD_iot.ppm" width="400"/><br>
+<img src="FD_learning/resources/7_FD_iot.ppm" width="400"/><br>
 Figure from: https://www.researchgate.net/publication/356249953/figure/fig1/AS:1092587159076864@1637504486141/Federated-Learning-for-IoT-Devices.ppm
 <center>
 
 <center>
-<img src="resources/6_FD_auto.png" width="400"/><br>
+<img src="FD_learning/resources/6_FD_auto.png" width="400"/><br>
 Figure from: https://www.semanticscholar.org/paper/Federated-Semi-Supervised-Learning-for-Object-in-Chi-Wang/569aafb945854b09ba3a47fc6376d83cced03597
 <center>
 ## Advantages of Federated Learning
