@@ -52,6 +52,8 @@ In classical machine learning, the process typically follows these steps:
 <img src="FD_learning/resources/2_machine_learning.png" width="400"/><br>
 Figure from: https://7wdata.be/big-data/building-the-machine-learning-infrastructure/
 <center>
+
+
 ### Federated Learning Approach
 
 Federated Learning reverses this process:
@@ -65,6 +67,8 @@ Federated Learning reverses this process:
 <img src="FD_learning/resources/3_FD_learning.ppm" width="400"/><br>
 Figure from: https://www.researchgate.net/figure/The-framework-of-Federated-Learning-Graphical-illustration-of-the-working-principle-of_fig1_367191647
 <center>
+
+
 ## Challenges of Classical Machine Learning
 
 Centralized machine learning approaches face several significant challenges. Strict data protection laws, such as GDPR in Europe and HIPAA in healthcare, often prohibit transferring and collecting sensitive data in a single location. Increasing privacy concerns also make users and organizations reluctant to share raw data outside their devices or institutions. Additionally, sending massive datasets over the internet requires high bandwidth and storage costs, and some applications demand immediate, on-device processing that centralized systems cannot provide. These factors together make it difficult for traditional centralized machine learning to meet real-world requirements.
@@ -92,6 +96,8 @@ Technical and economic constraints:
 - **Bandwidth Limitations:** Large datasets cannot be efficiently transmitted
 - **Storage Costs:** Centralized storage of massive datasets is expensive
 - **Real-time Requirements:** Some applications require immediate local processing -->
+
+
 ## The Federated Learning Process
 
 Federated learning operates through a systematic five-step process that repeats until the model reaches convergence:
