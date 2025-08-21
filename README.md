@@ -1,66 +1,132 @@
-# Teaching Federated Learning: From Basics to Research
+# Federated Learning Workshop — Modules
 
-## Overview
-
-This workshop on Federated Learning (FL) is designed to be **entry-point flexible**. Learners begin with a quick survey to assess their background and confidence. Based on the result, they start at the most appropriate sub‑module and then proceed sequentially from there. This structure supports diverse learners and emphasizes pedagogical flexibility.
+Hands-on modules you can run independently or in sequence. Start wherever fits your needs.
 
 ---
 
-## Learning Framework
-
-Our design draws on key educational frameworks:
-
-- **Differentiated Instruction**: Tailors entry points, content, and assessment to learner readiness, interests, and learning profiles to maximize engagement and learning effectiveness 
-- **Universal Design for Learning (UDL)**: Promotes flexible learning pathways using **multiple means of engagement, representation, and expression**—making content accessible and meaningful to all learners 
-
----
-
-## Overall Learning Objectives
-
-By the end of the workshop, learners will be able to:
-
-- **Remember** core concepts of Federated Learning.
-- **Understand** how FL differs from centralized and distributed paradigms.
-- **Apply** FL algorithms in notebook environments for collaborative model training.
-- **Analyze** the impact of IID vs. non‑IID data distributions.
-- **Evaluate** FL model robustness under adversarial poisoning.
-- **Create** scalable experiments using HPC infrastructure and SLURM.
+## Table of Contents
+- [Quickstart](#quickstart)
+- [Modules](#modules)
+  - [Module 1 — FL Basics (Notebook)](#module-1--fl-basics-notebook)
+  - [Module 2 — Core Algorithms (FedSGD / FedAvg)](#module-2--core-algorithms-fedsgd--fedavg)
+  - [Module 3 — Data Heterogeneity (IID vs Non-IID)](#module-3--data-heterogeneity-iid-vs-non-iid)
+  - [Module 4 — Surrogates & Poisoning Attacks](#module-4--surrogates--poisoning-attacks)
+  - [Module 5 — HPC / SLURM Experiments](#module-5--hpc--slurm-experiments)
+- [Repo Layout](#repo-layout)
+- [Common CLI Flags](#common-cli-flags)
+- [Notes](#notes)
+- [License](#license)
 
 ---
 
-## Flexible Entry and Sequential Progression
+## Quickstart
 
-Learner progression:
+    # Create & activate venv
+    python -m venv .venv && source .venv/bin/activate
+    pip install -r requirements.txt
 
-1. **Survey & Pre‑Assessment** (planned): Helps determine learner’s current understanding and confidence.
-2. **Module Selection**: The survey suggests the most suitable starting module (1–5) based on readiness.
-3. **Sequential Pathway**: From that entry point, learners continue in numerical order (e.g. start at Module 3, then 4, then 5).
+    # Pick a module and run
+    # Module 1 (Notebook)
+    jupyter lab notebooks/01_intro_fl.ipynb
+
+    # Module 2 (FedAvg example)
+    python modules/02_core_algos/fedavg.py --dataset MNIST --rounds 50
+
+    # Module 3 (Dirichlet non-IID)
+    python modules/03_heterogeneity/run.py --partition dirichlet --alpha 0.2
+
+    # Module 4 (Label flip attack)
+    python modules/04_attacks/label_flip.py --flip-rate 0.2
+
+    # Module 5 (HPC / SLURM)
+    sbatch slurm/fedavg_mnist.sbatch
+
+**Start here if…**
+- **Module 1**: you want a 10-minute end-to-end FL demo.
+- **Module 2**: you want baselines (FedAvg/FedSGD) and simple comparisons.
+- **Module 3**: you want IID vs. non-IID splits and fairness/accuracy metrics.
+- **Module 4**: you want quick poisoning baselines and robustness deltas.
+- **Module 5**: you want to scale runs on a cluster with SLURM.
 
 ---
 
-## Sub‑Module Learning Objectives 
+## Modules
 
-### Module 1: Noob Introduction to FL  
-- **Define** federated learning; **compare** it with centralized/distributed learning.  
-- **Identify** FL components and use cases.  
-- **Use** Colab notebooks confidently for FL exploration.
+### Module 1 — FL Basics (Notebook)
+**Purpose:** Minimal client/server loop to see FL end-to-end.
 
-### Module 2: Class Lab – Core FL Algorithms  
-- **Differentiate** between FedSGD, FedAvg, and similar algorithms.  
-- **Demonstrate** model training and aggregation in notebooks.  
-- **Explain** trade-offs in communication, convergence, and privacy.
+- **What’s inside:** tiny CNN on MNIST, local client steps, server aggregation, basic metrics, save/load.
+- **Run:** open `notebooks/01_intro_fl.ipynb` in Jupyter/Colab.
+- **Outputs:**
+  - `artifacts/m1_intro/model.pt`
+  - `artifacts/m1_intro/metrics.json`
 
-### Module 3: Homework – IID vs Non‑IID & Data Heterogeneity  
-- **Compare** IID vs non‑IID distributions; **analyze** effects on performance.  
-- **Simulate** heterogeneity scenarios for model fairness and accuracy.  
-- **Reflect** on algorithmic mitigation strategies.
+---
 
-### Module 4: Class Project – Surrogate Models & Poisoning Attacks  
-- **Describe** black‑box poisoning attacks in FL.  
-- **Construct** a surrogate model to mimic FL behavior.  
-- **Design** and **execute** a poisoning strategy, then **evaluate** its impact.
+### Module 2 — Core Algorithms (FedSGD / FedAvg)
+**Purpose:** Train/compare algorithms; inspect rounds, accuracy, and bandwidth.
 
-### Module 5: Research Level – HPC & SLURM‑Driven Experiments  
-- **Translate** notebook workflows into SLURM-managed jobs.  
-- **Design** experiments across algorithms, attacks, and defense strategies.  
-- **Collect**, **analyze**, and **synthesize** experimental results.
+- **What’s inside:** FedSGD, FedAvg, local epochs, optimizer swaps, convergence plots.
+- **Run:**
+
+      python modules/02_core_algos/fedavg.py --dataset MNIST --rounds 50 --local-epochs 1
+      python modules/02_core_algos/fedsgd.py  --dataset MNIST --rounds 200
+
+- **Outputs:**
+  - `artifacts/m2_core/*.pt`
+  - `artifacts/m2_core/curves.csv`
+
+---
+
+### Module 3 — Data Heterogeneity (IID vs Non-IID)
+**Purpose:** Generate client data splits and evaluate effects.
+
+- **What’s inside:** IID, shard-based, and Dirichlet partitions (`alpha ↓` ⇒ more skew), per-client metrics.
+- **Run:**
+
+      python modules/03_heterogeneity/run.py --partition iid
+      python modules/03_heterogeneity/run.py --partition dirichlet --alpha 0.2
+      # Optional shards:
+      # python modules/03_heterogeneity/run.py --partition shards --shards-per-client 2
+
+- **Outputs:**
+  - `artifacts/m3_het/partitions.json`
+  - `artifacts/m3_het/metrics.csv`
+
+---
+
+### Module 4 — Surrogates & Poisoning Attacks
+**Purpose:** Try simple attacks and measure robustness.
+
+- **What’s inside:** label-flip, backdoor trigger, optional surrogate for black-box crafting; basic defenses.
+- **Run:**
+
+      # Label flip (e.g., 1↔7 for MNIST)
+      python modules/04_attacks/label_flip.py --flip-rate 0.2
+
+      # Backdoor (square trigger)
+      python modules/04_attacks/backdoor.py --pattern square --poison-frac 0.1 --target 7
+
+      # Optional defenses
+      # --defense median | trimmed_mean
+
+- **Outputs:**
+  - `artifacts/m4_attacks/*.pt`
+  - `reports/m4_attacks/*.md` (attack summary & deltas)
+
+---
+
+### Module 5 — HPC / SLURM Experiments
+**Purpose:** Scale experiments on a cluster.
+
+- **What’s inside:** SLURM jobs, sweeps (rounds/clients/alpha), optional W&B + Optuna integration.
+- **Run:**
+
+      sbatch slurm/fedavg_mnist.sbatch
+      sbatch slurm/sweep_dirichlet_alpha.sbatch
+
+- **Outputs:**
+  - `logs/slurm/*.out`
+  - `artifacts/*`
+  - (Optional) W&B runs
+
