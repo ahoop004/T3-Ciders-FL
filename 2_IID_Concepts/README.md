@@ -55,7 +55,7 @@ Procedure:
 
 3. Enforce minimal sample constraints: if any client ends with zero of a class or too few total samples, resample or reallocate.  
 
-4. Optionally, use *self-balancing* (in implementations) to prevent extreme imbalance: once a client’s total exceeds average, skip further allocation to it. (See Flower’s DirichletPartitioner) :contentReference[oaicite:1]{index=1}
+4. Optionally, use *self-balancing* (in implementations) to prevent extreme imbalance: once a client’s total exceeds average, skip further allocation to it. (See Flower’s DirichletPartitioner) 
 
 This yields a per-client label mixture that is random but controlled by $\alpha$.
 
@@ -102,8 +102,6 @@ Here is a non-exhaustive list of algorithmic approaches to handle non-IID:
 | **FedDC** | Track local drift and correct updates | Effective in non-IID settings |
 | **Client clustering / personalization** | Partition clients into clusters or adapt local personalization | Tailors models per cluster  |
 | **Regularization / drift learning** | Penalize drift direction (e.g. Learning from Drift)  | Reduces harmful deviation |
-
-You can mention one or two in lecture, and students may later implement them in advanced modules.
 
 ---
 
