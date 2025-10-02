@@ -8,8 +8,8 @@ Hands-on modules you can run independently or in sequence. Start wherever fits y
 - [Quickstart](#quickstart)
 - [Modules](#modules)
   - [Module 1 — FL Basics (Notebook)](#module-1--fl-basics-notebook)
-  - [Module 2 — Core Algorithms (FedSGD / FedAvg)](#module-2--core-algorithms-fedsgd--fedavg)
-  - [Module 3 — Data Heterogeneity (IID vs Non-IID)](#module-3--data-heterogeneity-iid-vs-non-iid)
+  - [Module 2 — Data Heterogeneity (IID vs Non-IID)](#module-3--data-heterogeneity-iid-vs-non-iid)
+  - [Module 3 — Core Algorithms (FedSGD / FedAvg)](#module-2--core-algorithms-fedsgd--fedavg)
   - [Module 4 — Surrogates & Poisoning Attacks](#module-4--surrogates--poisoning-attacks)
   - [Module 5 — HPC / SLURM Experiments](#module-5--hpc--slurm-experiments)
 - [Repo Layout](#repo-layout)
@@ -23,8 +23,8 @@ Hands-on modules you can run independently or in sequence. Start wherever fits y
 
 **Start here if…**
 - **Module 1**: you want an end-to-end FL demo.
-- **Module 2**: you want baselines and simple comparisons.
-- **Module 3**: you want IID vs. non-IID splits.
+- **Module 2**: you want IID vs. non-IID splits.
+- **Module 3**: you want baselines and simple comparisons.
 - **Module 4**: you want adversarial examples.
 - **Module 5**: you want to scale runs on a cluster with SLURM.
 
@@ -37,20 +37,19 @@ Hands-on modules you can run independently or in sequence. Start wherever fits y
 
 - **What’s inside:** tiny CNN on MNIST, local client steps, aggregation, basic metrics, save/load.
 
-
-
-### Module 2 — Core Algorithms 
-**Purpose:** Train/compare algorithms; inspect rounds, and accuracy.
-
-- **What’s inside:** FedAvg, FedAdagrad, FedAdam, FedYogi, SCAFFOLD.
-
-
 ---
 
-### Module 3 — Data Heterogeneity (IID vs Non-IID)
+### Module 2 — Data Heterogeneity (IID vs Non-IID)
 **Purpose:** Generate client data splits and evaluate effects.
 
 - **What’s inside:** IID and Dirichlet partitions.
+
+---
+
+### Module 3 — Core Algorithms 
+**Purpose:** Train/compare algorithms; inspect rounds, and accuracy.
+
+- **What’s inside:** FedAvg, FedAdagrad, FedAdam, FedYogi, SCAFFOLD.
 
 
 ---
