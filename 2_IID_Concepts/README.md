@@ -118,7 +118,6 @@ In your notebook, students will:
 5. Observe and compare metrics: global test accuracy, per-client losses, convergence curves.  
 6. Reflect: at what $\alpha$ does FL “break”?
 
-You can link their plots here (e.g. “See figure generated in cell 3: class mix across clients for α=0.01,0.1,1.0”).
 
 ---
 
