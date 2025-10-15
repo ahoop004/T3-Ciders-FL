@@ -46,9 +46,7 @@ Let:
 Procedure:
 
 1. For each class $k = 1,\dots,K$, draw  
-   $
-     \mathbf{p}_k = (p_{k,1}, p_{k,2}, \dots, p_{k,N}) \sim \mathrm{Dirichlet}(\alpha, \alpha, \dots, \alpha)
-   $
+   $ \mathbf{p}_k = (p_{k,1}, p_{k,2}, \dots, p_{k,N})$ $ \sim \mathrm{Dirichlet}(\alpha, \alpha, \dots, \alpha)$
    so that $\sum_i p_{k,i} = 1$.  
 
 2. Let $n_k$ = number of samples of class $k$ in the global dataset.  
