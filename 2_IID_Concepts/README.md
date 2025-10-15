@@ -1,5 +1,6 @@
 # Section 2: Non-IID Data & Dirichlet Partitioning
-
+![IID image](https://github.com/ahoop004/T3-Ciders-FL/blob/main/2_IID_Concepts/iid_1.png)
+Hellström, Henrik & Silva, José & Fodor, Viktoria & Fischione, Carlo. (2020). Wireless for Machine Learning. 10.48550/arXiv.2008.13492. 
 ## Motivation
 
 In real federated learning systems, clients hold datasets from distinct environments (users, devices, hospitals, regions). Thus their local data distributions are rarely IID.  
