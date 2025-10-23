@@ -42,47 +42,8 @@ The contrast highlights how little needs to change in the aggregation pipeline f
 
 ---
 
-## 4. Directory Structure
 
-Module 4 now ships with a modular layout that separates attack primitives, helpers, runnable scripts, and teaching artifacts:
-
-```
-4_Adversarial_FL/
-├── README.md
-├── __init__.py
-├── attacks/
-│   ├── __init__.py
-│   ├── fgsm.py
-│   ├── pgd.py
-│   └── random_noise.py
-├── attacks.py              # compatibility shim for legacy imports
-├── black_box_runner.py
-├── client.py
-├── configs/
-│   └── surrogate_attack.yaml
-├── helpers/
-│   ├── __init__.py
-│   ├── client_wrappers.py
-│   └── dataset_utils.py
-├── load_data_for_clients.py
-├── malicious_client.py
-├── model.py
-├── notebooks/
-│   └── SurrogateAttack.ipynb
-├── scripts/
-│   ├── run_surrogate_attack.py
-│   └── visualize_attack_metrics.py
-└── util_functions.py
-```
-
-- `attacks/` hosts the FGSM, PGD, and random-noise routines with a registry (`get_attack`) for easy extension.
-- `helpers/` centralises dataset preparation and client instantiation so both the runner and scripts stay aligned.
-- `scripts/` offers CLI entry points for launching experiments and plotting metrics.
-- `notebooks/SurrogateAttack.ipynb` mirrors the CLI workflow in an interactive, classroom-friendly format.
-
----
-
-## 5. Configuration Knobs
+## 4. Configuration Knobs
 
 Attack experiments will expose the following key parameters (default sources indicated in parentheses):
 
@@ -104,40 +65,6 @@ These knobs sit alongside the global FL hyperparameters already defined in Secti
 
 ---
 
-## 6. Workflow Overview
 
-1. **Dataset preparation**: Reuse the partitioning utilities from Section 3 (`load_data_for_clients.py`) to obtain client-specific dataloaders.
-2. **Surrogate warm-up**: For each malicious client, call `MaliciousClient.train_surrogate` to adapt the surrogate network using its local shard (optionally augmented with external data).
-3. **Attack execution**: During local updates, `MaliciousClient.perform_attack` selects PGD/FGSM/random-noise attacks defined in the `attacks/` package and poisons a fraction of minibatch samples.
-4. **Aggregation**: Server aggregates honest and malicious updates via FedAvg (no server-side changes required).
-5. **Evaluation**: Use the notebook (`notebooks/SurrogateAttack.ipynb`) and visualization scripts to compare clean vs. attacked rounds—plot target-class accuracy, overall test accuracy, and loss curves.
-
-Quick start from the repository root:
-
-```bash
-python -m 4_Adversarial_FL.scripts.run_surrogate_attack --results artifacts/surrogate_metrics.json
-python -m 4_Adversarial_FL.scripts.visualize_attack_metrics artifacts/surrogate_metrics.json
-```
-
----
-
-## 7. Reused Helpers and Extensibility
-
-Nearly all foundational FL machinery is shared with Section 3:
-
-- Client lifecycle (sampling, local epochs) continues to rely on [`client.py`](../3_Algorithms/client.py).
-- Model instantiation for both honest and surrogate agents calls into [`model.py`](../3_Algorithms/model.py).
-- Training utilities, randomness control, and evaluation reuse [`util_functions.py`](../3_Algorithms/util_functions.py).
-- Any additional helper modules added under `helpers/` should import from Section 3 rather than duplicating logic (e.g., `set_seed`, accuracy calculators).
-
-This reuse ensures experiments remain comparable across sections and keeps maintenance overhead low—new adversarial behaviors simply compose on top of the existing FL stack.
-
----
-
-## 8. Next Steps
-
-- **Extend attacks**: add label-flipping, backdoor triggers, or model-replacement variants and register them in `attacks/`.
-- **Defensive baselines**: integrate robust aggregation (e.g., Krum, Trimmed Mean) or anomaly scoring in the server loop for comparison.
-- **Experiment tracking**: wire the runner into Weights & Biases or MLflow for richer telemetry beyond the built-in JSON export.
 
 These extensions build on the refactored toolkit and help transition from surrogate demonstrations to full-fledged adversarial FL research.
