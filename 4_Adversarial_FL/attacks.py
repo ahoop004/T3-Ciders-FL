@@ -1,30 +1,39 @@
-import torch
+"""Backwards-compatible shims for attack utilities.
 
-def fgsm(model, criterion, images, labels, step_size):
-    images = images.clone().detach().requires_grad_(True)
-    outputs = model(images)
-    loss = criterion(outputs, labels)
-    model.zero_grad()
-    loss.backward()
-    adv_images = images + step_size * images.grad.sign()
-    return torch.clamp(adv_images, 0, 1)
+The real implementations now live under ``4_Adversarial_FL.attacks``.
+"""
 
-def rand_noise_attack(images, step_size):
-    perturb = torch.randn_like(images)
-    adv_images = images + step_size * perturb.sign()
-    return torch.clamp(adv_images, 0, 1)
+from __future__ import annotations
 
-def pgd_attack(model, criterion, images, labels,
-               eps=0.3, step_size=0.004, iters=40):
-    ori = images.clone().detach()
-    adv = ori.clone().detach()
-    for _ in range(iters):
-        adv.requires_grad_(True)
-        outputs = model(adv)
-        loss = criterion(outputs, labels)
-        model.zero_grad()
-        loss.backward()
-        adv = adv + step_size * adv.grad.sign()
-        eta = torch.clamp(adv - ori, min=-eps, max=eps)
-        adv = torch.clamp(ori + eta, 0, 1).detach()
-    return adv
+import warnings
+
+from .attacks import fgsm_attack as _fgsm_attack
+from .attacks import pgd_attack as _pgd_attack
+from .attacks import random_noise_attack as _random_noise_attack
+
+
+def _warn_deprecated() -> None:
+    warnings.warn(
+        "Importing attacks from '4_Adversarial_FL.attacks' is deprecated. "
+        "Please switch to '4_Adversarial_FL.attacks.<name>' or the registry interface.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
+def fgsm(*args, **kwargs):
+    _warn_deprecated()
+    return _fgsm_attack(*args, **kwargs)
+
+
+def rand_noise_attack(*args, **kwargs):
+    _warn_deprecated()
+    return _random_noise_attack(*args, **kwargs)
+
+
+def pgd_attack(*args, **kwargs):
+    _warn_deprecated()
+    return _pgd_attack(*args, **kwargs)
+
+
+__all__ = ["fgsm", "pgd_attack", "rand_noise_attack"]

@@ -42,32 +42,43 @@ The contrast highlights how little needs to change in the aggregation pipeline f
 
 ---
 
-## 4. Expected Directory Structure
+## 4. Directory Structure
 
-To keep adversarial experiments organized, we expect the following layout (new folders marked with ⭐️ will be introduced alongside this documentation):
+Module 4 now ships with a modular layout that separates attack primitives, helpers, runnable scripts, and teaching artifacts:
 
 ```
 4_Adversarial_FL/
 ├── README.md
-├── attacks/ ⭐️
+├── __init__.py
+├── attacks/
 │   ├── __init__.py
 │   ├── fgsm.py
 │   ├── pgd.py
 │   └── random_noise.py
-├── configs/ ⭐️
+├── attacks.py              # compatibility shim for legacy imports
+├── black_box_runner.py
+├── client.py
+├── configs/
 │   └── surrogate_attack.yaml
+├── helpers/
+│   ├── __init__.py
+│   ├── client_wrappers.py
+│   └── dataset_utils.py
+├── load_data_for_clients.py
+├── malicious_client.py
+├── model.py
 ├── notebooks/
 │   └── SurrogateAttack.ipynb
-├── scripts/ ⭐️
+├── scripts/
 │   ├── run_surrogate_attack.py
 │   └── visualize_attack_metrics.py
-├── malicious_client.py
-└── helpers/
-    ├── client_wrappers.py ⭐️
-    └── dataset_utils.py ⭐️
+└── util_functions.py
 ```
 
-Current prototype code lives in `malicious_client.py` and `attacks.py`; as we expand the lab, the attack routines will be migrated into the `attacks/` package and reusable loaders/visualizations into `helpers/` and `scripts/`.
+- `attacks/` hosts the FGSM, PGD, and random-noise routines with a registry (`get_attack`) for easy extension.
+- `helpers/` centralises dataset preparation and client instantiation so both the runner and scripts stay aligned.
+- `scripts/` offers CLI entry points for launching experiments and plotting metrics.
+- `notebooks/SurrogateAttack.ipynb` mirrors the CLI workflow in an interactive, classroom-friendly format.
 
 ---
 
@@ -75,10 +86,10 @@ Current prototype code lives in `malicious_client.py` and `attacks.py`; as we ex
 
 Attack experiments will expose the following key parameters (default sources indicated in parentheses):
 
-- **Malicious fraction** (`malicious_fraction` in future `surrogate_attack.yaml`): percentage of participating clients each round that instantiate `MaliciousClient` instead of the base `Client`.
+- **Malicious fraction** (`malicious.fraction` in `configs/surrogate_attack.yaml`): percentage of participating clients each round that instantiate `MaliciousClient` instead of the base `Client`.
 - **Poison rate** (`poison_rate` inside each malicious client’s config): probability that an example in a minibatch is replaced with a crafted adversarial sample targeting `target_label`.
 - **Target label** (`target_label`): class index that poisoned examples should be misclassified as.
-- **PGD hyperparameters** (to be housed in `configs/surrogate_attack.yaml`):
+- **PGD hyperparameters** (defined in `configs/surrogate_attack.yaml`):
   - `epsilon`: $L_\infty$ perturbation budget.
   - `step_size`: per-iteration step length.
   - `iters`: number of inner PGD steps.
@@ -101,6 +112,13 @@ These knobs sit alongside the global FL hyperparameters already defined in Secti
 4. **Aggregation**: Server aggregates honest and malicious updates via FedAvg (no server-side changes required).
 5. **Evaluation**: Use the notebook (`notebooks/SurrogateAttack.ipynb`) and visualization scripts to compare clean vs. attacked rounds—plot target-class accuracy, overall test accuracy, and loss curves.
 
+Quick start from the repository root:
+
+```bash
+python -m 4_Adversarial_FL.scripts.run_surrogate_attack --results artifacts/surrogate_metrics.json
+python -m 4_Adversarial_FL.scripts.visualize_attack_metrics artifacts/surrogate_metrics.json
+```
+
 ---
 
 ## 7. Reused Helpers and Extensibility
@@ -118,8 +136,8 @@ This reuse ensures experiments remain comparable across sections and keeps maint
 
 ## 8. Next Steps
 
-- Finalize the modular `attacks/` package and migrate the current FGSM/PGD implementations into individual files.
-- Create `configs/surrogate_attack.yaml` mirroring Section 3’s configuration style for reproducible attack sweeps.
-- Author the `notebooks/SurrogateAttack.ipynb` walkthrough guiding students through setup, execution, and analysis of surrogate-driven poisoning runs.
+- **Extend attacks**: add label-flipping, backdoor triggers, or model-replacement variants and register them in `attacks/`.
+- **Defensive baselines**: integrate robust aggregation (e.g., Krum, Trimmed Mean) or anomaly scoring in the server loop for comparison.
+- **Experiment tracking**: wire the runner into Weights & Biases or MLflow for richer telemetry beyond the built-in JSON export.
 
-These deliverables will complete the bridge from Section 3’s optimization focus to a comprehensive adversarial FL lab.
+These extensions build on the refactored toolkit and help transition from surrogate demonstrations to full-fledged adversarial FL research.

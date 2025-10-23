@@ -15,8 +15,12 @@ import torch
 import yaml
 
 from .client import Client
-from .load_data_for_clients import dist_data_per_client
-from .malicious_client import MaliciousClient
+from .helpers import (
+    build_attack_payload,
+    create_client_pool,
+    prepare_client_dataloaders,
+    select_malicious_ids,
+)
 from .util_functions import evaluate_fn, resolve_callable, set_logger, set_seed
 
 
@@ -69,17 +73,10 @@ class FedAvgRunner:
         self.results: Dict[str, List[float]] = {"loss": [], "accuracy": []}
 
     def setup(self) -> None:
-        data_path = self.data_config.get("dataset_path", "./data")
-        dataset_name = self.data_config.get("dataset_name", "CIFAR10")
-        non_iid_per = float(self.data_config.get("non_iid_per", 0.0))
-
         logging.info("Preparing client datasets")
-        local_datasets, test_dataset = dist_data_per_client(
-            data_path,
-            dataset_name,
-            self.num_clients,
-            self.batch_size,
-            non_iid_per,
+        local_datasets, test_dataset = prepare_client_dataloaders(
+            self.data_config,
+            self.fed_config,
             self.device,
         )
         self.test_loader = test_dataset
@@ -89,45 +86,21 @@ class FedAvgRunner:
     def _create_clients(self, local_datasets: Iterable) -> List[Client]:
         malicious_enabled = bool(self.malicious_config.get("enabled", False))
         malicious_fraction = float(self.malicious_config.get("fraction", 0.0)) if malicious_enabled else 0.0
-        num_malicious = int(np.floor(self.num_clients * malicious_fraction))
-        malicious_ids = set()
-        if num_malicious > 0:
-            malicious_ids = set(
-                np.random.choice(self.num_clients, size=num_malicious, replace=False).tolist()
-            )
-        attack_payload = {
-            key: value
-            for key, value in self.malicious_config.items()
-            if key not in {"enabled", "fraction"}
-        }
-        attack_payload.setdefault("attack", {})
-        attack_payload.setdefault("surrogate", {})
-        attack_payload["attack"].setdefault("num_classes", self.model_kwargs.get("num_classes", 10))
-        attack_payload["surrogate"].setdefault("num_classes", self.model_kwargs.get("num_classes", 10))
+        malicious_ids = select_malicious_ids(self.num_clients, malicious_fraction) if malicious_enabled else []
+        attack_payload = build_attack_payload(
+            self.malicious_config,
+            num_classes=self.model_kwargs.get("num_classes", 10),
+        )
 
-        clients: List[Client] = []
-        for idx, dataset in enumerate(local_datasets):
-            if idx in malicious_ids:
-                client = MaliciousClient(
-                    client_id=idx,
-                    local_data=dataset,
-                    device=self.device,
-                    num_epochs=self.num_epochs,
-                    criterion=self.criterion,
-                    lr=self.lr_l,
-                    attack_config=deepcopy(attack_payload),
-                )
-            else:
-                client = Client(
-                    client_id=idx,
-                    local_data=dataset,
-                    device=self.device,
-                    num_epochs=self.num_epochs,
-                    criterion=self.criterion,
-                    lr=self.lr_l,
-                )
-            clients.append(client)
-        return clients
+        return create_client_pool(
+            local_datasets,
+            device=self.device,
+            num_epochs=self.num_epochs,
+            criterion=self.criterion,
+            lr=self.lr_l,
+            malicious_ids=malicious_ids,
+            attack_payload=deepcopy(attack_payload),
+        )
 
     def sample_clients(self) -> List[int]:
         if self.clients is None:

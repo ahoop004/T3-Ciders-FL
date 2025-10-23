@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 import torch
 from torch.utils.data import DataLoader
 
-from .attacks import fgsm, pgd_attack, rand_noise_attack
+from .attacks import get_attack
 from .client import Client
 from .model import MobileNetV2Transfer
 from .util_functions import resolve_callable, set_seed
@@ -41,6 +41,7 @@ class MaliciousClient(Client):
             raise ValueError("`target_label` must be provided when poison_rate > 0.")
 
         self.attack_type = self.attack_params.get("type", "pgd").lower()
+        self.attack_fn = get_attack(self.attack_type)
         loss_path = self.attack_params.get("criterion", "torch.nn.CrossEntropyLoss")
         self.attack_criterion = resolve_callable(loss_path)()
 
@@ -89,31 +90,32 @@ class MaliciousClient(Client):
                 self.surrogate_optimizer.step()
 
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        attack_type = self.attack_type
-        if attack_type == "fgsm":
-            return fgsm(
-                model=self.surrogate,
-                criterion=self.attack_criterion,
-                images=x,
-                labels=y,
-                step_size=float(self.attack_params.get("step_size", 0.003)),
+        attack_key = self.attack_type
+        kwargs: Dict[str, Any] = {"images": x}
+
+        if attack_key in {"fgsm", "pgd"}:
+            kwargs.update(
+                {
+                    "model": self.surrogate,
+                    "criterion": self.attack_criterion,
+                    "labels": y,
+                }
             )
-        if attack_type == "rand_noise":
-            return rand_noise_attack(
-                images=x,
-                step_size=float(self.attack_params.get("step_size", 0.003)),
+
+        if attack_key == "pgd":
+            kwargs.update(
+                {
+                    "eps": float(self.attack_params.get("epsilon", 0.03)),
+                    "step_size": float(self.attack_params.get("step_size", 0.007)),
+                    "iters": int(self.attack_params.get("iters", 10)),
+                }
             )
-        if attack_type == "pgd":
-            return pgd_attack(
-                model=self.surrogate,
-                criterion=self.attack_criterion,
-                images=x,
-                labels=y,
-                eps=float(self.attack_params.get("epsilon", 0.03)),
-                step_size=float(self.attack_params.get("step_size", 0.007)),
-                iters=int(self.attack_params.get("iters", 10)),
-            )
-        raise ValueError(f"Unknown attack type: {attack_type}")
+        elif attack_key == "fgsm":
+            kwargs["step_size"] = float(self.attack_params.get("step_size", 0.003))
+        else:
+            kwargs["step_size"] = float(self.attack_params.get("step_size", 0.003))
+
+        return self.attack_fn(**kwargs)
 
     def client_update(self) -> None:
         if self.x is None:

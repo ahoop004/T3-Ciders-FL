@@ -1,0 +1,44 @@
+global:
+  seed: 27
+  log_dir: ./Logs/surrogate_attack
+
+data:
+  dataset_path: ./data
+  dataset_name: CIFAR10
+  non_iid_per: 0.2
+
+federated:
+  algorithm: FedAvg
+  num_clients: 10
+  fraction_clients: 0.5
+  num_rounds: 3
+  num_epochs: 1
+  batch_size: 32
+  global_stepsize: 1.0
+  local_stepsize: 0.1
+  criterion: torch.nn.CrossEntropyLoss
+
+model:
+  module: 4_Adversarial_FL.model
+  name: MobileNetV3Transfer
+  kwargs:
+    num_classes: 10
+  pretrained: true
+
+malicious:
+  enabled: true
+  fraction: 0.2
+  seed: 2024
+  attack:
+    type: pgd
+    poison_rate: 0.3
+    target_label: 0
+    epsilon: 0.03
+    step_size: 0.007
+    iters: 7
+    criterion: torch.nn.CrossEntropyLoss
+  surrogate:
+    pretrained: true
+    lr: 0.0005
+    finetune_epochs: 1
+    batch_size: 32
