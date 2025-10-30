@@ -3,13 +3,13 @@ seed: 27
 baseline:
   dataset_path: ./Data/Imagenette
   dataset_name: Imagenette
-  non_iid_per: 0.1
-  num_clients: 12
-  fraction_clients: 0.5
-  num_rounds: 30
-  num_epochs: 5
-  batch_size: 32
-  local_lr: 0.01
+  non_iid_per: 0.0
+  num_clients: 50
+  fraction_clients: 0.6
+  num_rounds: 80
+  num_epochs: 15
+  batch_size: 96
+  local_lr: 0.003
   global_lr: 1.0
   num_classes: 10
   criterion: torch.nn.CrossEntropyLoss
@@ -17,13 +17,13 @@ baseline:
 surrogate:
   dataset_path: ./Data/Imagenette
   dataset_name: Imagenette
-  non_iid_per: 0.1
-  num_clients: 12
-  fraction_clients: 0.5
-  num_rounds: 5
-  num_epochs: 5
-  batch_size: 32
-  local_lr: 0.0005
+  non_iid_per: 0.0
+  num_clients: 50
+  fraction_clients: 0.6
+  num_rounds: 80
+  num_epochs: 15
+  batch_size: 96
+  local_lr: 0.003
   global_lr: 1.0
   num_classes: 10
   criterion: torch.nn.CrossEntropyLoss

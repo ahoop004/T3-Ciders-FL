@@ -1,74 +1,69 @@
 # Section 4: Adversarial Federated Learning Lab
 
-Module 4 is now centred on an interactive lab notebook that walks through a surrogate-driven poisoning attack in a federated learning system. You will read, tweak, and execute the code that orchestrates malicious clients directly inside the notebook—no external runner required.
+Module 4 explores how a malicious client can poison a federated model when it lacks perfect knowledge of the target network. The interactive notebook guides you through clean training, surrogate fine-tuning, and the deployment of gradient-based attacks that transfer from the surrogate to the global model.
 
 ---
 
-## Learning Objectives
+## 1. Attack Targets at a Glance
 
-- Diagnose how a malicious client can poison the global model using surrogate-driven adversarial examples.
-- Compare clean and attacked FedAvg rounds by instrumenting the training loop yourself.
-- Experiment with hyperparameters (malicious fraction, perturbation budgets, target labels) and observe their impact.
-- Reuse the client/model scaffolding from earlier modules while keeping the attack logic transparent.
+- **Poisoning style:** adversaries inject crafted samples into their local batches to steer the global model.
+- **Objectives:**
+  - *Class-targeted poisoning* — force a specific label to be misclassified (e.g., road signs → “speed limit 60”).
+  - *Performance degradation* — lower overall accuracy without an obvious label signature.
+- **Knowledge scenarios:**
+  - *White-box* — attacker knows the exact architecture/weights and can optimise attacks directly.
+  - *Black-box* — attacker only sees model snapshots or predictions, so it trains a surrogate and transfers attacks.
+
+Our lab focuses on the black-box story: the attacker approximates the server model with a MobileNetV2 surrogate, crafts PGD/FGSM/random-noise perturbations on that surrogate, and then poisons the federated rounds.
 
 ---
 
-## Before You Start
+## 2. What You Will Do
 
-Brush up on the Module 3 materials—especially `client.py`, `model.py`, and the FedAvg workflow—so the modifications introduced for adversarial behaviour feel familiar. Comfort with PyTorch autograd and gradient-based attacks (PGD/FGSM) will make the lab much smoother.
+1. **Run a clean baseline:** train a MobileNetV3 FedAvg model on Imagenette to establish reference metrics.
+2. **Tune a surrogate:** fine-tune a pretrained MobileNetV2 on a single client shard so the attacker gains a stand-in model.
+3. **Craft attacks:** generate adversarial batches (PGD, FGSM, random noise) using the surrogate.
+4. **Deploy poisoning:** replace a fraction of local samples with attacked inputs and compare global metrics against the clean run.
+
+Along the way you will adjust attack budgets, malicious client fractions, and target labels to see how they influence convergence.
 
 ---
 
-## Directory Overview
+## 3. Project Layout
 
 ```
 4_Adversarial_FL/
 ├── README.md
-├── Adversarial_FL_Lab.ipynb   # guided lab notebook
-├── __init__.py
-├── attacks/                   # PGD, FGSM, random-noise primitives
-├── attacks.py                 # legacy convenience shim
-├── client.py                  # honest client implementation
-├── load_data_for_clients.py   # non-IID dataset splitter
-├── malicious_client.py        # surrogate-enabled attacker
-├── model.py                   # MobileNet transfer backbone
-└── util_functions.py          # shared metrics + utilities
+├── Adversarial_FL_Lab.ipynb     # main lab experience
+├── attacks/                     # PGD, FGSM, random-noise implementations
+├── client.py                    # honest client logic
+├── malicious_client.py          # surrogate-aware malicious client
+├── load_data_for_clients.py     # dataset partitioning utilities
+├── model.py                     # MobileNet backbones (V2 surrogate, V3 target)
+└── util_functions.py            # data prep, evaluation, and helper utilities
 ```
 
-Everything you need to run the lab lives alongside the notebook. The Python modules remain available for reference and reuse; the notebook explains how each piece fits together.
+The notebook is self-contained, but the supporting modules are light enough to read and modify as you explore.
 
 ---
 
-## Working Through the Lab
+## 4. Suggested Workflow
 
-1. Open `Adversarial_FL_Lab.ipynb` and read the short orientation section.
-2. Execute the setup cells to load the dataset, instantiate clients, and configure the attack.
-3. Step through the clean vs. malicious training loops—each cell narrates what is happening and exposes the relevant code.
-4. Use the analysis section to compare metrics and visualise the poisoning impact.
-5. Modify the provided hyperparameters or attack routines and re-run cells to explore counterfactuals.
+1. Open `Adversarial_FL_Lab.ipynb`.
+2. Execute the setup cells to download Imagenette, partition clients, and load the config.
+3. Train the clean baseline; inspect the accuracy table and plots.
+4. Fine-tune the surrogate and craft adversarial examples.
+5. Run the poisoned experiment and compare metrics/participation logs.
+6. Iterate on hyperparameters (e.g., poison rate, attack iterations, malicious fraction) to test different what-if scenarios.
 
-Inline prompts highlight where to pause, predict outcomes, or record observations. Treat it like a lab worksheet.
-
----
-
-## Supporting Modules
-
-The notebook imports the following modules when it needs reusable components:
-
-- `client.py` / `malicious_client.py`: define the behaviour of honest and adversarial participants.
-- `attacks/`: houses gradient-based perturbation logic the malicious client can call.
-- `model.py`: provides the MobileNet transfer model used by both honest and surrogate learners.
-- `load_data_for_clients.py`: partitions CIFAR-10 (or another dataset) into per-client loaders with optional non-IID skew.
-- `util_functions.py`: supplemental helpers for evaluation, seeding, and metrics.
-
-Feel free to open these files while following the lab—they are intentionally lightweight and well-commented.
+Inline notes flag decision points and questions to consider as you step through the lab.
 
 ---
 
-## Going Further
+## 5. Next Experiments
 
-- Add alternative adversaries (label flipping, backdoor triggers) by extending `attacks/` and wiring them into the notebook exercises.
-- Prototype server-side defences (Krum, trimmed mean, anomaly scores) and compare them against the baseline poisoned run.
-- Track experiments with an external tool (Weights & Biases, MLflow) by inserting logging hooks where the notebook highlights evaluation steps.
+- Swap in alternative attack objectives (label flipping, backdoor triggers) by extending `attacks/`.
+- Prototype defences such as trimmed mean or anomaly scoring and drop them into the FedAvg loop.
+- Track experiments with external tooling (e.g., Weights & Biases) for longer sweeps.
 
-Use the notebook as your launch pad for deeper adversarial FL investigations.
+Use the lab as a springboard for researching black-box vs. white-box poisoning strategies and the defences that can mitigate them.
