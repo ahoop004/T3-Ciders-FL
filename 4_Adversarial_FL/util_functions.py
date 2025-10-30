@@ -76,14 +76,14 @@ def create_data(data_path: str, dataset_name: str):
             root=data_path,
             split="train",
             size="full",
-            download=False,
+            download=True,
             transform=preprocess,
         )
         test_data = Imagenette(
             root=data_path,
             split="val",
             size="full",
-            download=False,
+            download=True,
             transform=eval_transform,
         )
 
@@ -125,12 +125,12 @@ def create_data(data_path: str, dataset_name: str):
             )
 
         dataset_cls = datasets.__dict__[key]
-        params = {}
+        params = {"download": True}
         if "train" in dataset_cls.__init__.__code__.co_varnames:
             params["train"] = True
-            train_data = dataset_cls(root=data_path, download=True, transform=transform, **params)
+            train_data = dataset_cls(root=data_path, transform=transform, **params)
             params["train"] = False
-            test_data = dataset_cls(root=data_path, download=True, transform=transform, **params)
+            test_data = dataset_cls(root=data_path, transform=transform, **params)
         else:
             train_data = dataset_cls(root=data_path, split="train", download=True, transform=transform)
             test_data = dataset_cls(root=data_path, split="test", download=True, transform=transform)
