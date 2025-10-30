@@ -1,10 +1,8 @@
-"""Utilities and runners for adversarial federated learning experiments."""
+"""Adversarial federated learning toolkit supporting the lab notebook."""
 
 __all__ = [
     "attacks",
-    "black_box_runner",
     "client",
-    "helpers",
     "load_data_for_clients",
     "malicious_client",
     "model",

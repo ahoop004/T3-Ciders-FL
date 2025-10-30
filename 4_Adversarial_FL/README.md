@@ -1,143 +1,74 @@
-# Section 4: Adversarial Federated Learning
+# Section 4: Adversarial Federated Learning Lab
 
-This section builds on the optimization algorithms from [Section 3](../3_Algorithms/README.md) to explore **surrogate-driven poisoning attacks** in a federated learning (FL) setting. Whereas Section 3 centers on honest aggregation (FedAvg, FedOpt variants, SCAFFOLD), we now assume some clients are malicious and actively perturb their updates to subvert the global model.
-
----
-
-## 1. Objectives
-
-By the end of this module students should be able to:
-
-- Explain how an adversary can leverage a local surrogate model to craft adversarial examples that poison the global model while remaining undetected by the server.
-- Compare the dynamics of a clean FedAvg run versus a run with malicious participants executing Projected Gradient Descent (PGD) attacks.
-- Tune attack- and defense-specific hyperparameters (e.g., poison rate, PGD budget, surrogate fine-tuning schedule) to study their effect on convergence and accuracy.
-- Reuse the core FL components from Section 3 to instrument adversarial behavior with minimal code duplication.
+Module 4 is now centred on an interactive lab notebook that walks through a surrogate-driven poisoning attack in a federated learning system. You will read, tweak, and execute the code that orchestrates malicious clients directly inside the notebook—no external runner required.
 
 ---
 
-## 2. Prerequisites
+## Learning Objectives
 
-Students should first review the following materials from Section 3:
-
-- [`client.py`](../3_Algorithms/client.py): defines the base `Client` class that our malicious client inherits from.
-- [`model.py`](../3_Algorithms/model.py): provides the MobileNet transfer-learning backbones for both honest and surrogate models.
-- [`util_functions.py`](../3_Algorithms/util_functions.py) and [`load_data_for_clients.py`](../3_Algorithms/load_data_for_clients.py): helper utilities for seeding, metrics, and partitioning datasets across clients.
-- [`config.yaml`](../3_Algorithms/config.yaml): reference for global training knobs (rounds, local epochs, batch size) that remain applicable here.
-
-A working understanding of the FedAvg and FedOpt workflows described in [`3_Algorithms/README.md`](../3_Algorithms/README.md) is assumed, along with familiarity with PyTorch autograd and crafting gradient-based adversarial examples.
+- Diagnose how a malicious client can poison the global model using surrogate-driven adversarial examples.
+- Compare clean and attacked FedAvg rounds by instrumenting the training loop yourself.
+- Experiment with hyperparameters (malicious fraction, perturbation budgets, target labels) and observe their impact.
+- Reuse the client/model scaffolding from earlier modules while keeping the attack logic transparent.
 
 ---
 
-## 3. Clean FedAvg vs. Surrogate-Driven Attack
+## Before You Start
 
-| Aspect | Clean FedAvg Run | Surrogate-Driven Attack |
-|--------|------------------|-------------------------|
-| Client behavior | All participants follow the base `Client` update rule from Section 3, training on their local data and reporting honest gradients/weights. | A subset of clients is replaced by `MaliciousClient`, which fine-tunes a surrogate network and injects adversarially perturbed samples during local training. |
-| Data pipeline | Uses the IID/non-IID splits from `load_data_for_clients.py` without modification. | Malicious clients dynamically modify minibatches by replacing a fraction of samples with PGD-crafted inputs targeting a specific label.
-| Update aggregation | Server performs vanilla FedAvg over all client updates. | Aggregation remains FedAvg, but poisoned gradients shift the global model toward the attacker’s target.
-| Additional computation | None beyond standard local training. | Malicious clients run surrogate fine-tuning loops, PGD attack iterations, and optional randomness (FGSM/noise baselines).
-| Expected outcome | Converges to a high-accuracy model (modulo heterogeneity). | Targeted accuracy degrades; the model may misclassify target label inputs while clean accuracy can remain deceptively high.
-
-The contrast highlights how little needs to change in the aggregation pipeline for a potent attack—most modifications occur on the client side while the server remains oblivious.
+Brush up on the Module 3 materials—especially `client.py`, `model.py`, and the FedAvg workflow—so the modifications introduced for adversarial behaviour feel familiar. Comfort with PyTorch autograd and gradient-based attacks (PGD/FGSM) will make the lab much smoother.
 
 ---
 
-## 4. Directory Structure
-
-Module 4 now ships with a modular layout that separates attack primitives, helpers, runnable scripts, and teaching artifacts:
+## Directory Overview
 
 ```
 4_Adversarial_FL/
 ├── README.md
+├── Adversarial_FL_Lab.ipynb   # guided lab notebook
 ├── __init__.py
-├── attacks/
-│   ├── __init__.py
-│   ├── fgsm.py
-│   ├── pgd.py
-│   └── random_noise.py
-├── attacks.py              # compatibility shim for legacy imports
-├── black_box_runner.py
-├── client.py
-├── configs/
-│   └── surrogate_attack.yaml
-├── helpers/
-│   ├── __init__.py
-│   ├── client_wrappers.py
-│   └── dataset_utils.py
-├── load_data_for_clients.py
-├── malicious_client.py
-├── model.py
-├── notebooks/
-│   └── SurrogateAttack.ipynb
-├── scripts/
-│   ├── run_surrogate_attack.py
-│   └── visualize_attack_metrics.py
-└── util_functions.py
+├── attacks/                   # PGD, FGSM, random-noise primitives
+├── attacks.py                 # legacy convenience shim
+├── client.py                  # honest client implementation
+├── load_data_for_clients.py   # non-IID dataset splitter
+├── malicious_client.py        # surrogate-enabled attacker
+├── model.py                   # MobileNet transfer backbone
+└── util_functions.py          # shared metrics + utilities
 ```
 
-- `attacks/` hosts the FGSM, PGD, and random-noise routines with a registry (`get_attack`) for easy extension.
-- `helpers/` centralises dataset preparation and client instantiation so both the runner and scripts stay aligned.
-- `scripts/` offers CLI entry points for launching experiments and plotting metrics.
-- `notebooks/SurrogateAttack.ipynb` mirrors the CLI workflow in an interactive, classroom-friendly format.
+Everything you need to run the lab lives alongside the notebook. The Python modules remain available for reference and reuse; the notebook explains how each piece fits together.
 
 ---
 
-## 5. Configuration Knobs
+## Working Through the Lab
 
-Attack experiments will expose the following key parameters (default sources indicated in parentheses):
+1. Open `Adversarial_FL_Lab.ipynb` and read the short orientation section.
+2. Execute the setup cells to load the dataset, instantiate clients, and configure the attack.
+3. Step through the clean vs. malicious training loops—each cell narrates what is happening and exposes the relevant code.
+4. Use the analysis section to compare metrics and visualise the poisoning impact.
+5. Modify the provided hyperparameters or attack routines and re-run cells to explore counterfactuals.
 
-- **Malicious fraction** (`malicious.fraction` in `configs/surrogate_attack.yaml`): percentage of participating clients each round that instantiate `MaliciousClient` instead of the base `Client`.
-- **Poison rate** (`poison_rate` inside each malicious client’s config): probability that an example in a minibatch is replaced with a crafted adversarial sample targeting `target_label`.
-- **Target label** (`target_label`): class index that poisoned examples should be misclassified as.
-- **PGD hyperparameters** (defined in `configs/surrogate_attack.yaml`):
-  - `epsilon`: $L_\infty$ perturbation budget.
-  - `step_size`: per-iteration step length.
-  - `iters`: number of inner PGD steps.
-- **Surrogate fine-tuning schedule**:
-  - `surrogate_finetune_epochs`: number of epochs used in `MaliciousClient.train_surrogate`.
-  - `surrogate_batch_size`: minibatch size for the surrogate’s fine-tuning loader.
-  - `surrogate_lr`: learning rate for the surrogate optimizer.
-  - `surrogate_pretrained`: whether to initialize from ImageNet weights to accelerate convergence.
-- **Criterion** (`criterion`): loss function string evaluated via `eval` when instantiating the surrogate, mirroring the setup in Section 3.
-
-These knobs sit alongside the global FL hyperparameters already defined in Section 3’s `config.yaml`, enabling combined sweeps over participation rates, local epochs, and attack strength.
+Inline prompts highlight where to pause, predict outcomes, or record observations. Treat it like a lab worksheet.
 
 ---
 
-## 6. Workflow Overview
+## Supporting Modules
 
-1. **Dataset preparation**: Reuse the partitioning utilities from Section 3 (`load_data_for_clients.py`) to obtain client-specific dataloaders.
-2. **Surrogate warm-up**: For each malicious client, call `MaliciousClient.train_surrogate` to adapt the surrogate network using its local shard (optionally augmented with external data).
-3. **Attack execution**: During local updates, `MaliciousClient.perform_attack` selects PGD/FGSM/random-noise attacks defined in the `attacks/` package and poisons a fraction of minibatch samples.
-4. **Aggregation**: Server aggregates honest and malicious updates via FedAvg (no server-side changes required).
-5. **Evaluation**: Use the notebook (`notebooks/SurrogateAttack.ipynb`) and visualization scripts to compare clean vs. attacked rounds—plot target-class accuracy, overall test accuracy, and loss curves.
+The notebook imports the following modules when it needs reusable components:
 
-Quick start from the repository root:
+- `client.py` / `malicious_client.py`: define the behaviour of honest and adversarial participants.
+- `attacks/`: houses gradient-based perturbation logic the malicious client can call.
+- `model.py`: provides the MobileNet transfer model used by both honest and surrogate learners.
+- `load_data_for_clients.py`: partitions CIFAR-10 (or another dataset) into per-client loaders with optional non-IID skew.
+- `util_functions.py`: supplemental helpers for evaluation, seeding, and metrics.
 
-```bash
-python -m 4_Adversarial_FL.scripts.run_surrogate_attack --results artifacts/surrogate_metrics.json
-python -m 4_Adversarial_FL.scripts.visualize_attack_metrics artifacts/surrogate_metrics.json
-```
+Feel free to open these files while following the lab—they are intentionally lightweight and well-commented.
 
 ---
 
-## 7. Reused Helpers and Extensibility
+## Going Further
 
-Nearly all foundational FL machinery is shared with Section 3:
+- Add alternative adversaries (label flipping, backdoor triggers) by extending `attacks/` and wiring them into the notebook exercises.
+- Prototype server-side defences (Krum, trimmed mean, anomaly scores) and compare them against the baseline poisoned run.
+- Track experiments with an external tool (Weights & Biases, MLflow) by inserting logging hooks where the notebook highlights evaluation steps.
 
-- Client lifecycle (sampling, local epochs) continues to rely on [`client.py`](../3_Algorithms/client.py).
-- Model instantiation for both honest and surrogate agents calls into [`model.py`](../3_Algorithms/model.py).
-- Training utilities, randomness control, and evaluation reuse [`util_functions.py`](../3_Algorithms/util_functions.py).
-- Any additional helper modules added under `helpers/` should import from Section 3 rather than duplicating logic (e.g., `set_seed`, accuracy calculators).
-
-This reuse ensures experiments remain comparable across sections and keeps maintenance overhead low—new adversarial behaviors simply compose on top of the existing FL stack.
-
----
-
-## 8. Next Steps
-
-- **Extend attacks**: add label-flipping, backdoor triggers, or model-replacement variants and register them in `attacks/`.
-- **Defensive baselines**: integrate robust aggregation (e.g., Krum, Trimmed Mean) or anomaly scoring in the server loop for comparison.
-- **Experiment tracking**: wire the runner into Weights & Biases or MLflow for richer telemetry beyond the built-in JSON export.
-
-These extensions build on the refactored toolkit and help transition from surrogate demonstrations to full-fledged adversarial FL research.
+Use the notebook as your launch pad for deeper adversarial FL investigations.
