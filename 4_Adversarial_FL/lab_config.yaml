@@ -1,0 +1,34 @@
+seed: 27
+
+baseline:
+  dataset_path: ./data
+  dataset_name: CIFAR10
+  non_iid_per: 0.2
+  num_clients: 20
+  fraction_clients: 0.4
+  num_rounds: 20
+  num_epochs: 3
+  batch_size: 64
+  local_lr: 0.01
+  global_lr: 1.0
+  criterion: torch.nn.CrossEntropyLoss
+
+surrogate:
+  client_id: 0
+  epochs: 3
+  lr: 0.001
+  batch_size: 64
+  criterion: torch.nn.CrossEntropyLoss
+
+attack:
+  type: pgd
+  poison_rate: 0.2
+  target_label: 0
+  epsilon: 0.03137255
+  step_size: 0.00784314
+  iters: 10
+  criterion: torch.nn.CrossEntropyLoss
+
+attack_run:
+  malicious_fraction: 0.2
+  seed: 2024
