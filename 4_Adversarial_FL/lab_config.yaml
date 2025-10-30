@@ -1,28 +1,38 @@
 seed: 27
 
 baseline:
-  dataset_path: ./data
-  dataset_name: CIFAR10
-  non_iid_per: 0.2
-  num_clients: 20
-  fraction_clients: 0.4
-  num_rounds: 20
-  num_epochs: 3
-  batch_size: 64
+  dataset_path: ./Data/Imagenette
+  dataset_name: Imagenette
+  non_iid_per: 0.1
+  num_clients: 12
+  fraction_clients: 0.5
+  num_rounds: 30
+  num_epochs: 5
+  batch_size: 32
   local_lr: 0.01
   global_lr: 1.0
+  num_classes: 10
   criterion: torch.nn.CrossEntropyLoss
 
 surrogate:
-  client_id: 0
-  epochs: 3
-  lr: 0.001
-  batch_size: 64
+  dataset_path: ./Data/Imagenette
+  dataset_name: Imagenette
+  non_iid_per: 0.1
+  num_clients: 12
+  fraction_clients: 0.5
+  num_rounds: 5
+  num_epochs: 5
+  batch_size: 32
+  local_lr: 0.0005
+  global_lr: 1.0
+  num_classes: 10
   criterion: torch.nn.CrossEntropyLoss
+  pretrained: true
+  client_id: 0
 
 attack:
   type: pgd
-  poison_rate: 0.2
+  poison_rate: 0.25
   target_label: 0
   epsilon: 0.03137255
   step_size: 0.00784314

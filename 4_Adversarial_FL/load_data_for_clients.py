@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from .util_functions import LoadData, create_data, numpy_to_tensor, set_seed
+from .util_functions import LoadData, create_data, set_seed
 
 
 # Returns num_clients loaders plus a test loader for evaluation.
@@ -27,7 +27,7 @@ def dist_data_per_client(
     set_seed(27)
     print("\nPreparing Data")
 
-    cache_id = f"{dataset_name}_{num_clients}_{batch_size}_{non_iid_per}".encode()
+    cache_id = f"v2_{dataset_name}_{num_clients}_{batch_size}_{non_iid_per}".encode()
     cache_hash = hashlib.md5(cache_id).hexdigest()
     os.makedirs("cache", exist_ok=True)
     cache_file = os.path.join("cache", f"client_data_{cache_hash}.pkl")
@@ -113,9 +113,12 @@ def dist_data_per_client(
 
     client_loaders = []
     for feats, labels in zip(client_data_feats, client_data_labels):
-        x_tensor = numpy_to_tensor(np.asarray(feats), device, "float")
-        y_tensor = numpy_to_tensor(np.asarray(labels), device, "long")
-        dataset = LoadData(x_tensor, y_tensor)
+        feats_array = np.asarray(feats, dtype=np.float32)
+        if feats_array.size:
+            feats_array /= 255.0
+        feats_tensor = torch.tensor(feats_array, dtype=torch.float32)
+        labels_tensor = torch.tensor(np.asarray(labels), dtype=torch.long)
+        dataset = LoadData(feats_tensor, labels_tensor)
         client_loaders.append(DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=0))
 
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True, num_workers=0)

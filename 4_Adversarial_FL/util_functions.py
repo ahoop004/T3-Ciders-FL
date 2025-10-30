@@ -4,6 +4,7 @@ import logging
 import os
 import random
 from importlib import import_module
+from types import SimpleNamespace
 from typing import Any, Callable, Tuple
 
 import matplotlib.pyplot as plt
@@ -11,6 +12,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
+
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
 def set_logger(log_path: str) -> None:
@@ -53,37 +57,42 @@ def create_data(data_path: str, dataset_name: str):
     if key == "IMAGENETTE":
         from torchvision.datasets import Imagenette
 
-        transform = transforms.Compose(
+        preprocess = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+            ]
+        )
+        eval_transform = transforms.Compose(
             [
                 transforms.Resize(256),
                 transforms.CenterCrop(224),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ]
         )
 
-        train_data = Imagenette(
+        raw_train = Imagenette(
             root=data_path,
             split="train",
             size="full",
             download=False,
-            transform=transform,
+            transform=preprocess,
         )
         test_data = Imagenette(
             root=data_path,
             split="val",
             size="full",
             download=False,
-            transform=transform,
+            transform=eval_transform,
         )
 
         imgs, labels = [], []
-        for img_tensor, label in train_data:
-            img = img_tensor.cpu().permute(1, 2, 0).numpy()
-            imgs.append(img)
+        for img, label in raw_train:
+            arr = np.asarray(img.convert("RGB"), dtype=np.uint8)
+            imgs.append(arr)
             labels.append(label)
-        train_data.data = np.stack(imgs)
-        train_data.targets = labels
+        train_data = SimpleNamespace(data=np.stack(imgs), targets=labels)
 
         return train_data, test_data
 
@@ -91,15 +100,18 @@ def create_data(data_path: str, dataset_name: str):
         if key == "CIFAR10":
             transform = transforms.Compose(
                 [
+                    transforms.Resize(224),
                     transforms.ToTensor(),
-                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ]
             )
         elif key == "MNIST":
             transform = transforms.Compose(
                 [
+                    transforms.Resize(224),
+                    transforms.Grayscale(num_output_channels=3),
                     transforms.ToTensor(),
-                    transforms.Normalize((0.1307,), (0.3081,)),
+                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ]
             )
         else:
@@ -108,7 +120,7 @@ def create_data(data_path: str, dataset_name: str):
                     transforms.Resize(256),
                     transforms.CenterCrop(224),
                     transforms.ToTensor(),
-                    transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ]
             )
 
@@ -128,9 +140,15 @@ def create_data(data_path: str, dataset_name: str):
         )
 
     if hasattr(train_data, "data") and getattr(train_data.data, "ndim", 0) == 3:
-        train_data.data = train_data.data.unsqueeze(3)
+        if isinstance(train_data.data, np.ndarray):
+            train_data.data = np.expand_dims(train_data.data, axis=3)
+        else:
+            train_data.data = train_data.data.unsqueeze(3)
     if hasattr(test_data, "data") and getattr(test_data.data, "ndim", 0) == 3:
-        test_data.data = test_data.data.unsqueeze(3)
+        if isinstance(test_data.data, np.ndarray):
+            test_data.data = np.expand_dims(test_data.data, axis=3)
+        else:
+            test_data.data = test_data.data.unsqueeze(3)
 
     return train_data, test_data
 
@@ -140,7 +158,12 @@ class LoadData(Dataset):
         self.length = x.shape[0]
         self.x = x.permute(0, 3, 1, 2)
         self.y = y
-        self.image_transform = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        self.image_transform = transforms.Compose(
+            [
+                transforms.Resize(224),
+                transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+            ]
+        )
 
     def __getitem__(self, index):
         image, label = self.x[index], self.y[index]
