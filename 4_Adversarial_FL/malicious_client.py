@@ -8,10 +8,10 @@ from typing import Any, Dict, Optional
 import torch
 from torch.utils.data import DataLoader
 
-from .attacks import get_attack
-from .client import Client
-from .model import MobileNetV2Transfer
-from .util_functions import resolve_callable, set_seed
+from attacks import get_attack
+from client import Client
+from model import MobileNetV2Transfer
+from util_functions import resolve_callable, set_seed
 
 
 class MaliciousClient(Client):

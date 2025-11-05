@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import warnings
 
-from .attacks import fgsm_attack as _fgsm_attack
-from .attacks import pgd_attack as _pgd_attack
-from .attacks import random_noise_attack as _random_noise_attack
+from attacks import fgsm_attack as _fgsm_attack
+from attacks import pgd_attack as _pgd_attack
+from attacks import random_noise_attack as _random_noise_attack
 
 
 def _warn_deprecated() -> None:
