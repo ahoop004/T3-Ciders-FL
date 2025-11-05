@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from .util_functions import LoadData, create_data, set_seed
+from util_functions import LoadData, create_data, set_seed
 
 
 # Returns num_clients loaders plus a test loader for evaluation.
