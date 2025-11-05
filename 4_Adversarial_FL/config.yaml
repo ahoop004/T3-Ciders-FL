@@ -17,13 +17,13 @@ model_config:
 algorithms:
   FedAvg:
     fed_config:
-      fraction_clients: 0.1
-      num_clients: 100
-      num_rounds: 1
+      fraction_clients: 0.2
+      num_clients: 50
+      num_rounds: 20
       num_epochs: 5
-      batch_size: 64
-      global_stepsize: 0.1
-      local_stepsize: 0.01
+      batch_size: 128
+      global_stepsize: 1.0
+      local_stepsize: 0.003
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config: {}
 
