@@ -1,0 +1,107 @@
+data_config:
+  dataset_path: "./Data/Imagenette"
+  dataset_name: "Imagenette"
+  non_iid_per: 0
+
+global_config:
+  seed: 42
+  device: "cuda"
+
+model_config:
+  module: "model"
+  name: "MobileNetV3Transfer"
+  kwargs:
+    pretrained: true
+    num_classes: 10
+
+algorithms:
+  FedAvg:
+    fed_config:
+      fraction_clients: 0.1
+      num_clients: 100
+      num_rounds: 1
+      num_epochs: 5
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.01
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config: {}
+
+  Scaffold:
+    fed_config:
+      fraction_clients: 0.1
+      num_clients: 100
+      num_rounds: 1
+      num_epochs: 5
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.01
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      c_init: 0.05
+
+  FedAdam:
+    fed_config:
+      fraction_clients: 0.1
+      num_clients: 100
+      num_rounds: 1
+      num_epochs: 5
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.01
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      beta1: 0.9
+      beta2: 0.99
+      epsilon: 0.000001
+
+  FedAdagrad:
+    fed_config:
+      fraction_clients: 0.1
+      num_clients: 100
+      num_rounds: 1
+      num_epochs: 5
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.01
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      epsilon: 0.000001
+
+  FedYogi:
+    fed_config:
+      fraction_clients: 0.1
+      num_clients: 100
+      num_rounds: 1
+      num_epochs: 5
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.01
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      beta1: 0.9
+      beta2: 0.99
+      epsilon: 0.000001
+
+attack:
+  seed: 42
+  malicious_fraction: 0.1
+  poison_rate: 0.2
+  type: "pgd"
+  target_label: 0
+  epsilon: 0.03137255    # 8/255
+  step_size: 0.00784314      # 2/255
+  iters: 20
+
+  surrogate_model: "mobilenet_v2"
+  surrogate_pretrained: true
+  surrogate_finetune_epochs: 3
+  start_round: 5
+  surrogate_lr: 0.001
+  criterion: "torch.nn.CrossEntropyLoss"
+  surrogate_batch_size: 64
+  
+  poison_rate_schedule:
+    type: linear
+    start: 0.05
+    end:   0.2
