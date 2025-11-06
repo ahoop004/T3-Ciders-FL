@@ -64,15 +64,26 @@ class MaliciousClient(Client):
             pretrained=self.surrogate_params.get("pretrained", True),
             num_classes=num_classes,
         ).to(self.device)
+        if self.surrogate_params.get("freeze_backbone", False) and hasattr(self.surrogate, "v2model"):
+            for param in self.surrogate.v2model.features.parameters():
+                param.requires_grad = False
+
+        lr = self.surrogate_params.get("lr", self.surrogate_params.get("learning_rate", 1e-3))
+        weight_decay = self.surrogate_params.get("weight_decay", 0.0)
+        trainable_params = [p for p in self.surrogate.parameters() if p.requires_grad]
+        if not trainable_params:
+            raise RuntimeError("Surrogate has no trainable parameters configured.")
         self.surrogate_optimizer = torch.optim.Adam(
-            self.surrogate.parameters(),
-            lr=self.surrogate_params.get("lr", self.surrogate_params.get("learning_rate", 1e-3)),
+            trainable_params,
+            lr=lr,
+            weight_decay=weight_decay,
         )
 
         self.ft_epochs = int(self.surrogate_params.get("finetune_epochs", 0))
         default_batch_size = getattr(local_data, "batch_size", 32)
         self.ft_batch_size = int(self.surrogate_params.get("batch_size", default_batch_size))
         self._surrogate_dataset = getattr(local_data, "dataset", None)
+        self._early_stop_patience = int(self.surrogate_params.get("early_stop_patience", 0))
 
     def _surrogate_loader(self) -> Optional[DataLoader]:
         if self._surrogate_dataset is None:
@@ -90,7 +101,13 @@ class MaliciousClient(Client):
             return
 
         self.surrogate.train()
+        best_loss = float("inf")
+        best_state = None
+        epochs_since_improvement = 0
+
         for _ in range(self.ft_epochs):
+            running_loss = 0.0
+            batches = 0
             for inputs, labels in loader:
                 inputs = inputs.float().to(self.device)
                 labels = labels.long().to(self.device)
@@ -99,6 +116,22 @@ class MaliciousClient(Client):
                 loss = self.attack_criterion(preds, labels)
                 loss.backward()
                 self.surrogate_optimizer.step()
+                running_loss += loss.item()
+                batches += 1
+
+            if self._early_stop_patience:
+                epoch_loss = running_loss / max(batches, 1)
+                if epoch_loss + 1e-5 < best_loss:
+                    best_loss = epoch_loss
+                    best_state = deepcopy(self.surrogate.state_dict())
+                    epochs_since_improvement = 0
+                else:
+                    epochs_since_improvement += 1
+                    if epochs_since_improvement >= self._early_stop_patience:
+                        break
+
+        if best_state is not None:
+            self.surrogate.load_state_dict(best_state)
 
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         attack_key = self.attack_type
