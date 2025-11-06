@@ -100,22 +100,25 @@ algorithms:
 attack:
   seed: 42
   malicious_fraction: 0.1
-  poison_rate: 0.2
-  type: "pgd"
-  target_label: 0
-  epsilon: 0.03137255    # 8/255
-  step_size: 0.00784314      # 2/255
-  iters: 20
-
-  surrogate_model: "mobilenet_v2"
-  surrogate_pretrained: true
-  surrogate_finetune_epochs: 3
   start_round: 5
-  surrogate_lr: 0.001
-  criterion: "torch.nn.CrossEntropyLoss"
-  surrogate_batch_size: 64
-  
-  poison_rate_schedule:
-    type: linear
-    start: 0.05
-    end:   0.2
+  attack:
+    type: "pgd"
+    poison_rate: 0.2
+    target_label: 0
+    epsilon: 0.03137255    # 8/255
+    step_size: 0.00784314      # 2/255
+    iters: 20
+    criterion: "torch.nn.CrossEntropyLoss"
+    poison_rate_schedule:
+      type: linear
+      start: 0.05
+      end:   0.2
+  surrogate:
+    pretrained: true
+    finetune_epochs: 3
+    lr: 0.001
+    weight_decay: 0.0001
+    batch_size: 64
+    freeze_backbone: true
+    augment: true
+    early_stop_patience: 2

@@ -1,25 +1,33 @@
 import os
-from copy import deepcopy
-import logging
-from util_functions import set_logger, save_plt
-import torch
 import importlib
+import logging
+from copy import deepcopy
+from math import ceil
+
 import numpy as np
+import torch
 from torch.utils.data import DataLoader
-from model import *
-from load_data_for_clients import dist_data_per_client
-from util_functions import set_seed, evaluate_fn, run_fl
+
 from client import Client
+from load_data_for_clients import dist_data_per_client
+from model import *
+from util_functions import evaluate_fn, resolve_callable, run_fl, save_plt, set_logger, set_seed
 
 
         
 
 
-class Server():
-
-    def __init__(self, model_config={}, global_config={}, data_config={}, fed_config={}, optim_config={},attack_config=None):
-      
-        set_seed(global_config["seed"])
+class Server:
+    def __init__(
+        self,
+        model_config={},
+        global_config={},
+        data_config={},
+        fed_config={},
+        optim_config={},
+        attack_config=None,
+    ):
+        set_seed(global_config.get("seed", 42))
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.data_path = data_config["dataset_path"]
         self.dataset_name = data_config["dataset_name"]
@@ -29,22 +37,28 @@ class Server():
         self.num_rounds = fed_config["num_rounds"]
         self.num_epochs = fed_config["num_epochs"]
         self.batch_size = fed_config["batch_size"]
-        self.attack_config = attack_config
-        self.criterion = eval(fed_config["criterion"])()
+        self.attack_config = attack_config or {}
+        criterion = resolve_callable(fed_config["criterion"])
+        self.criterion = criterion()
         self.lr = fed_config["global_stepsize"]
         self.lr_l = fed_config["local_stepsize"]
         self.model_config = model_config
         self.model_module = importlib.import_module(model_config["module"])
         self.model_class = getattr(self.model_module, model_config["name"])
-        self.x = self.model_class(**model_config.get("kwargs", {}))   
-        self.clients = None       
+        self.x = self.model_class(**model_config.get("kwargs", {}))
+        self.clients = None
     
     def create_clients(self, local_datasets):
 
         from malicious_client import MaliciousClient
-        m_frac = self.attack_config.get("malicious_fraction", 0)
-        num_mal = int(self.num_clients * m_frac)
-        mal_ids = set(np.random.choice(self.num_clients, num_mal, replace=False))
+
+        m_frac = float(self.attack_config.get("malicious_fraction", 0))
+        num_mal = min(int(round(self.num_clients * m_frac)), self.num_clients)
+        mal_ids = (
+            set(np.random.choice(self.num_clients, num_mal, replace=False))
+            if num_mal > 0
+            else set()
+        )
         clients = []
         for idx, dataset in enumerate(local_datasets):
             if idx in mal_ids:
@@ -171,8 +185,16 @@ class FedOptClient(Client):
 
 
 class FedAdamServer(Server):
-    def __init__(self, model_config={}, global_config={}, data_config={}, fed_config={}, optim_config={}):
-        super().__init__(model_config, global_config, data_config, fed_config, optim_config)
+    def __init__(
+        self,
+        model_config={},
+        global_config={},
+        data_config={},
+        fed_config={},
+        optim_config={},
+        attack_config=None,
+    ):
+        super().__init__(model_config, global_config, data_config, fed_config, optim_config, attack_config)
         
         self.m = [torch.zeros_like(param, device=self.device) for param in self.x.parameters()]
         self.v = [torch.zeros_like(param, device=self.device) for param in self.x.parameters()]
@@ -219,8 +241,16 @@ class FedAdamServer(Server):
         self.timestep += 1
 
 class FedAdagradServer(Server):
-    def __init__(self, model_config={}, global_config={}, data_config={}, fed_config={}, optim_config={}):
-        super().__init__(model_config, global_config, data_config, fed_config, optim_config)
+    def __init__(
+        self,
+        model_config={},
+        global_config={},
+        data_config={},
+        fed_config={},
+        optim_config={},
+        attack_config=None,
+    ):
+        super().__init__(model_config, global_config, data_config, fed_config, optim_config, attack_config)
 
         self.s = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()] #state
         self.epsilon = 1e-6
@@ -260,8 +290,16 @@ class FedAdagradServer(Server):
 
 
 class FedYogiServer(Server):
-    def __init__(self, model_config={}, global_config={}, data_config={}, fed_config={}, optim_config={}):
-        super().__init__(model_config, global_config, data_config, fed_config, optim_config)
+    def __init__(
+        self,
+        model_config={},
+        global_config={},
+        data_config={},
+        fed_config={},
+        optim_config={},
+        attack_config=None,
+    ):
+        super().__init__(model_config, global_config, data_config, fed_config, optim_config, attack_config)
 
         self.m = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()] 
         self.v = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()]
@@ -342,7 +380,7 @@ class ScaffoldClient(Client):
 
             for del_y, param_y, param_x in zip(delta_y, self.y.parameters(), self.x.parameters()):
                 del_y.data += param_y.data.detach() - param_x.data.detach()
-            a = (ceil(len(self.data.dataset) / self.data.batch_size)*self.num_epochs*self.lr)
+            a = ceil(len(self.data.dataset) / self.data.batch_size) * self.num_epochs * self.lr
             for n_c, c_l, c_g, diff in zip(new_client_c, self.client_c, self.server_c, delta_y):
                 n_c.data += c_l.data - c_g.data - diff.data / a
 
@@ -354,8 +392,16 @@ class ScaffoldClient(Client):
         self.delta_c = delta_c
 
 class ScaffoldServer(Server):
-    def __init__(self, model_config={}, global_config={}, data_config={}, fed_config={}, optim_config={}):
-        super().__init__(model_config, global_config, data_config, fed_config, optim_config)
+    def __init__(
+        self,
+        model_config={},
+        global_config={},
+        data_config={},
+        fed_config={},
+        optim_config={},
+        attack_config=None,
+    ):
+        super().__init__(model_config, global_config, data_config, fed_config, optim_config, attack_config)
         self.server_c = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()]
         self.c_init = optim_config.get("c_init", 0.0)
 
