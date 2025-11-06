@@ -13,6 +13,25 @@ Goal: evaluate black‑box adversarial robustness for an **Imagenette** classifi
 ### Surrogate models
 A **surrogate** approximates the target decision function. Adversarial examples crafted on the surrogate often **transfer** to the target. In this notebook, train **MobileNetV2** on Imagenette (or on target‑labeled data) and attack **MobileNetV3**. Report transfer success as the fraction of adversarial inputs misclassified by the target.
 
+## Models: MobileNetV2 vs MobileNetV3
+
+### MobileNetV2 (target surrogate choice rationale)
+- **Core block:** *Inverted residual* with a **linear bottleneck**: expand with 1×1 conv → depthwise 3×3 → project with 1×1 conv; residual skip on matching shapes. Nonlinearity uses **ReLU6** except in the narrow bottleneck where it is removed to preserve information.
+- **Why it’s efficient:** depthwise separable convs reduce MACs; inverted residuals let most computation happen in the expanded space while keeping I/O channels small.
+- **Typical stack:** initial 3×3 conv, then ~17–19 bottleneck blocks with varying expansion \(t\), channels \(k\), and stride \(s\); global average pool and classifier.
+- **Why V2 as surrogate:** stable, widely available checkpoints, fast backprop, and gradients that transfer well to other mobile backbones.
+
+### MobileNetV3 (target model rationale)
+- **Search + design:** combines **hardware‑aware NAS** and **NetAdapt** to choose per‑layer channels and kernel sizes.
+- **Block improvements:** keeps the V2 inverted residual pattern but adds **Squeeze‑and‑Excitation (SE)** in many blocks and replaces ReLU with **hard‑swish**/**hard‑sigmoid** activations to improve accuracy‑latency trade‑offs on CPUs.
+- **Variants:** **MobileNetV3‑Large** and **V3‑Small**; both tailored to mobile inference.
+- **Why V3 as target:** higher ImageNet accuracy at lower latency than V2; better real‑device throughput for the same budget.
+
+### Practical differences for this project
+- **Transfer crafting:** craft FGSM/PGD on **V2** and evaluate transfer to **V3**; transferability is helped by shared inverted‑residual structure but moderated by V3’s SE and activation changes.
+- **Preprocessing:** both expect ImageNet‑style normalization and 224×224 inputs in standard training; keep normalization consistent across surrogate and target.
+- **Latency/accuracy:** at similar budgets, V3‑Large typically improves ImageNet top‑1 by ~3% over V2 while reducing CPU latency by ~20% (per original paper). This motivates using V3 as the stronger target and V2 as the efficient attacker.
+
 ## Attacks used here
 
 ### 1) Random noise (baseline)
@@ -62,6 +81,10 @@ Report for each attack and \(\epsilon\):
 - **Data poisoning, certified perspective:** Steinhardt, Koh, Liang. *Certified Defenses for Data Poisoning Attacks* (NeurIPS 2017).  
 - **FL model poisoning / backdoor:** Bagdasaryan et al. *How to Backdoor Federated Learning* (AISTATS 2020). Bhagoji et al. *Analyzing Federated Learning through an Adversarial Lens* (ICML 2019).  
 - **Corruption baseline:** Hendrycks, Dietterich. *Benchmarking Neural Network Robustness to Common Corruptions and Perturbations* (ICLR 2019).
+- **MobileNetV2:** Sandler, Howard, Zhu, Zhmoginov, Chen. *MobileNetV2: Inverted Residuals and Linear Bottlenecks* (CVPR 2018). arXiv:1801.04381. 
+- **MobileNetV3:** Howard, Sandler, Chu, Chen, Chen, Tan, Wang, Zhu, Pang, Vasudevan, Le, Adam. *Searching for MobileNetV3* (ICCV 2019). arXiv:1905.02244. 
+
+
 
 ## Minimal run notes
 1. Open `Adv_FL.ipynb` and run setup cells to install deps and load Imagenette. 

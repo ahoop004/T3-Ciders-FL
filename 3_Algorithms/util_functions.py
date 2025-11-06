@@ -174,46 +174,20 @@ def evaluate_fn(dataloader,model,loss_fn,device):
     total = 0
     correct = 0
 
-    for batch,(images,labels) in enumerate(dataloader):
-        output = model(images.to(device))
-        loss = loss_fn(output,labels.to(device))
-        running_loss += loss.item()
-        total += labels.size(0)
-        correct += (output.argmax(dim=1).cpu().detach() == labels.cpu().detach()).sum().item()
-   
-    avg_loss = running_loss/(batch+1)
+    num_batches = 0
+    with torch.no_grad():
+        for images, labels in dataloader:
+            output = model(images.to(device))
+            loss = loss_fn(output,labels.to(device))
+            running_loss += loss.item()
+            total += labels.size(0)
+            correct += (output.argmax(dim=1).cpu() == labels.cpu()).sum().item()
+            num_batches += 1
+
+    if num_batches == 0:
+        return 0.0, 0.0
+
+    avg_loss = running_loss/num_batches
     acc = 100*(correct/total)
     return avg_loss,acc
 
-
-def run_fl(Serv, global_config, data_config, fed_config, model_config, optim_config=None,attack_config=None):
-    
-    if not os.path.exists(f"./Logs/{fed_config['algorithm']}"):
-        os.mkdir(f"./Logs/{fed_config['algorithm']}",exist_ok=True)
-    if not os.path.exists(f"./Logs/{fed_config['algorithm']}/{data_config['non_iid_per']}"):
-        os.mkdir(f"./Logs/{fed_config['algorithm']}/{data_config['non_iid_per']}",exist_ok=True)
-
-    filename = f"./Logs/{fed_config['algorithm']}/{data_config['non_iid_per']}/"
-    set_logger(f"{filename}log.txt")
-    server = Serv(model_config, global_config, data_config, fed_config, optim_config,attack_config)
-    logging.info("Server is successfully initialized")
-    server.setup()  
-    server.train()  
-
-    # save_plt(
-    #     list(range(1, server.num_rounds + 1)),
-    #     server.results['accuracy'],
-    #     "Communication Round",
-    #     "Test Accuracy",
-    #     f"{filename}accgraph.png"
-    # )
-    # save_plt(
-    #     list(range(1, server.num_rounds + 1)),
-    #     server.results['loss'],
-    #     "Communication Round",
-    #     "Test Loss",
-    #     f"{filename}lossgraph.png"
-    # )
-    
-    logging.info("\nExecution has completed")
-    return server
