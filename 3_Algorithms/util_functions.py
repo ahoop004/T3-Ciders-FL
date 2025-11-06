@@ -34,10 +34,12 @@ def set_seed(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        if hasattr(torch.backends, "cudnn"):
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
 def create_data(data_path, dataset_name):
 
@@ -46,38 +48,43 @@ def create_data(data_path, dataset_name):
 
     if key == "IMAGENETTE":
         from torchvision.datasets import Imagenette
-        T = transforms.Compose([
+
+        base_transforms = [
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=(0.485, 0.456, 0.406),
-                std=(0.229, 0.224, 0.225)
-            ),
-        ])
+        ]
+        normalize = transforms.Normalize(
+            mean=(0.485, 0.456, 0.406),
+            std=(0.229, 0.224, 0.225),
+        )
+
+        train_transform = transforms.Compose(base_transforms)
+        eval_transform = transforms.Compose(base_transforms + [normalize])
+
         train_data = Imagenette(
             root=data_path,
             split="train",
-            size="full",      
-            download=False,
-            transform=T
+            size="full",
+            download=True,
+            transform=train_transform,
         )
         test_data = Imagenette(
             root=data_path,
             split="val",
             size="full",
-            download=False,
-            transform=T
+            download=True,
+            transform=eval_transform,
         )
 
         imgs, labels = [], []
         for img_tensor, label in train_data:
-            img = img_tensor.cpu().permute(1,2,0).numpy()
+            img = img_tensor.cpu().permute(1, 2, 0).numpy()
             imgs.append(img)
             labels.append(label)
-        train_data.data    = np.stack(imgs)
+        train_data.data = np.stack(imgs)
         train_data.targets = labels
-        
+
         return train_data, test_data
 
     if hasattr(datasets, key):
@@ -190,4 +197,3 @@ def evaluate_fn(dataloader,model,loss_fn,device):
     avg_loss = running_loss/num_batches
     acc = 100*(correct/total)
     return avg_loss,acc
-

@@ -2,6 +2,19 @@ import torch
 import torch.nn as nn
 import torchvision.models as tv_models
 
+try:
+    from torchvision.models import MobileNet_V2_Weights, MobileNet_V3_Small_Weights
+except ImportError:  # older torchvision
+    MobileNet_V2_Weights = MobileNet_V3_Small_Weights = None  # type: ignore[assignment]
+
+
+def _resolve_weights(pretrained, enum_cls):
+    if not pretrained:
+        return None
+    if enum_cls is None:
+        return "DEFAULT"
+    return enum_cls.DEFAULT
+
 class AlexNet(nn.Module):
     def __init__(self, num_classes=10):
         super(AlexNet, self).__init__()
@@ -65,7 +78,8 @@ class MobileNetV2Transfer(nn.Module):
     def __init__(self, pretrained: bool = True, num_classes: int = 10):
         super().__init__()
 
-        backbone = tv_models.mobilenet_v2(weights='DEFAULT')
+        weights = _resolve_weights(pretrained, MobileNet_V2_Weights)
+        backbone = tv_models.mobilenet_v2(weights=weights)
         
         in_feats = backbone.classifier[-1].in_features
 
@@ -82,7 +96,8 @@ class MobileNetV3Transfer(nn.Module):
     def __init__(self, pretrained: bool = True, num_classes: int = 10):
         super().__init__()
 
-        backbone = tv_models.mobilenet_v3_small(weights='DEFAULT')
+        weights = _resolve_weights(pretrained, MobileNet_V3_Small_Weights)
+        backbone = tv_models.mobilenet_v3_small(weights=weights)
         
         in_feats = backbone.classifier[-1].in_features
 
