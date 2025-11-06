@@ -8,7 +8,10 @@ from typing import Any, Dict, Optional
 import torch
 from torch.utils.data import DataLoader
 
-from attacks import get_attack
+try:
+    from attacks import get_attack
+except ImportError:  # attacks registry is optional when attacks are injected directly
+    get_attack = None
 from client import Client
 from model import MobileNetV2Transfer
 from util_functions import resolve_callable, set_seed
@@ -41,7 +44,15 @@ class MaliciousClient(Client):
             raise ValueError("`target_label` must be provided when poison_rate > 0.")
 
         self.attack_type = self.attack_params.get("type", "pgd").lower()
-        self.attack_fn = get_attack(self.attack_type)
+        attack_callable = self.attack_params.get("callable")
+        if attack_callable is not None:
+            self.attack_fn = attack_callable
+        elif get_attack is not None:
+            self.attack_fn = get_attack(self.attack_type)
+        else:
+            raise ImportError(
+                "No attack registry available. Provide attack_config['attack']['callable'] with a callable attack implementation."
+            )
         loss_path = self.attack_params.get("criterion", "torch.nn.CrossEntropyLoss")
         self.attack_criterion = resolve_callable(loss_path)()
 
@@ -92,6 +103,7 @@ class MaliciousClient(Client):
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         attack_key = self.attack_type
         kwargs: Dict[str, Any] = {"images": x}
+        targeted = bool(self.attack_params.get("targeted", self.target_label is not None))
 
         if attack_key in {"fgsm", "pgd"}:
             kwargs.update(
@@ -99,6 +111,7 @@ class MaliciousClient(Client):
                     "model": self.surrogate,
                     "criterion": self.attack_criterion,
                     "labels": y,
+                    "targeted": targeted,
                 }
             )
 

@@ -44,7 +44,13 @@ def dist_data_per_client(
     print("\nDividing the data among clients")
 
     classes = sorted(np.unique(y_train))
-    step = math.ceil(100 / len(classes))
+    num_classes = len(classes)
+    if num_clients < num_classes:
+        raise ValueError(
+            f"Cannot distribute data: num_clients ({num_clients}) must be at least the number of classes ({num_classes})."
+        )
+
+    step = math.ceil(100 / num_classes)
     min_client_in_chunk = 10
 
     client_data_feats: List[List[np.ndarray]] = [list() for _ in range(num_clients)]
@@ -62,16 +68,24 @@ def dist_data_per_client(
         class_chunks.append(class_chunk)
         tmp.extend(class_chunk)
 
-    clients_per_chunk: List[int] = []
-    total_clients = num_clients
-    for idx in range(len(class_chunks)):
-        max_clients = total_clients - min_client_in_chunk * (len(class_chunks) - idx - 1)
-        max_clients = max(max_clients, min_client_in_chunk)
-        clients_per_chunk.append(random.randint(min_client_in_chunk, max_clients))
-        total_clients -= clients_per_chunk[-1]
+    min_clients_per_chunk = min(min_client_in_chunk, max(1, num_clients // num_classes))
+
+    clients_per_chunk: List[int] = [min_clients_per_chunk for _ in range(num_classes)]
+    remaining_clients = num_clients - min_clients_per_chunk * num_classes
+
+    if remaining_clients > 0:
+        indices = list(range(num_classes))
+        while remaining_clients > 0:
+            random.shuffle(indices)
+            for idx in indices:
+                if remaining_clients == 0:
+                    break
+                clients_per_chunk[idx] += 1
+                remaining_clients -= 1
+
     print(clients_per_chunk)
 
-    cumulative_clients_per_chunk = [sum(clients_per_chunk[: i + 1]) for i in range(len(clients_per_chunk))]
+    cumulative_clients_per_chunk = np.cumsum(clients_per_chunk).tolist()
 
     class_count_dict = {class_label: 0 for class_label in classes}
 

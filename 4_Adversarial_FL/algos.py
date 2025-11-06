@@ -96,16 +96,20 @@ class Server():
             self.clients[idx].client_update()
 
     def server_update(self, client_ids):
+        num_participants = len(client_ids)
+        if num_participants == 0:
+            return
+
         self.x.to(self.device)
-        avg_y = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()]
-        
+        avg_y = [torch.zeros_like(param, device=self.device) for param in self.x.parameters()]
+
         with torch.no_grad():
             for idx in client_ids:
-                 for a_y, y in zip(avg_y, self.clients[idx].y.parameters()):
-                    a_y.data.add_(y.data / int(self.fraction * self.num_clients))
+                for a_y, y in zip(avg_y, self.clients[idx].y.parameters()):
+                    a_y.data.add_(y.data / num_participants)
 
             for param, a_y in zip(self.x.parameters(), avg_y):
-                param.data = a_y.data 
+                param.data = a_y.data
 
     def step(self):
         sampled_client_ids = self.sample_clients()
@@ -124,6 +128,7 @@ class Server():
             self.results['loss'].append(test_loss)
             self.results['accuracy'].append(test_acc)
             logging.info(f"\tLoss:{test_loss:.4f}   Accuracy:{test_acc:.2f}%")
+            print(f"\tServer Loss:{test_loss:.4f}   Accuracy:{test_acc:.2f}%")
 
 
 class FedOptClient(Client):
@@ -193,15 +198,18 @@ class FedAdamServer(Server):
         return clients
 
     def server_update(self, client_ids):
+        num_participants = len(client_ids)
+        if num_participants == 0:
+            return
 
         self.x.to(self.device)
-        gradients = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()] 
+        gradients = [torch.zeros_like(param, device=self.device) for param in self.x.parameters()]
         with torch.no_grad():
             for idx in client_ids:
                 for grad, diff in zip(gradients, self.clients[idx].delta_y):
-                    grad.data.add_(diff.data / int(self.fraction * self.num_clients))
+                    grad.data.add_(diff.data / num_participants)
 
-            for p,g,m,v in zip(self.x.parameters(), gradients, self.m, self.v):
+            for p, g, m, v in zip(self.x.parameters(), gradients, self.m, self.v):
                 m.data = self.beta1 * m.data + (1 - self.beta1) * g.data
                 v.data = self.beta2 * v.data + (1 - self.beta2) * torch.square(g.data)
                 m_bias_corr = m / (1 - self.beta1 ** self.timestep)
@@ -234,12 +242,16 @@ class FedAdagradServer(Server):
         return clients
 
     def server_update(self, client_ids):
+        num_participants = len(client_ids)
+        if num_participants == 0:
+            return
+
         self.x.to(self.device)
         gradients = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()] #gradients or delta_x
         with torch.no_grad():
             for idx in client_ids:
                 for grad, diff in zip(gradients, self.clients[idx].delta_y):
-                    grad.data.add_(diff.data / int(self.fraction * self.num_clients))
+                    grad.data.add_(diff.data / num_participants)
 
             for p,g,s in zip(self.x.parameters(), gradients, self.s):
                 s.data += torch.square(g.data)
@@ -275,13 +287,17 @@ class FedYogiServer(Server):
         return clients
 
     def server_update(self, client_ids):
+        num_participants = len(client_ids)
+        if num_participants == 0:
+            return
+
         self.x.to(self.device)
         gradients = [torch.zeros_like(param,device=self.device) for param in self.x.parameters()] 
         with torch.no_grad():
             for idx in client_ids:
        
                 for grad, diff in zip(gradients, self.clients[idx].delta_y):
-                    grad.data.add_(diff.data / int(self.fraction * self.num_clients))
+                    grad.data.add_(diff.data / num_participants)
 
             for p,g,m,v in zip(self.x.parameters(), gradients, self.m, self.v):
                 m.data = self.beta1 * m.data + (1 - self.beta1) * g.data
@@ -366,9 +382,12 @@ class ScaffoldServer(Server):
 
     def server_update(self, client_ids):
         self.x.to(self.device)
+        num_participants = len(client_ids)
+        if num_participants == 0:
+            return
         for idx in client_ids:
             with torch.no_grad():
                 for param, diff in zip(self.x.parameters(), self.clients[idx].delta_y):
-                    param.data.add_(diff.data * self.lr / int(self.fraction * self.num_clients))
+                    param.data.add_(diff.data * self.lr / num_participants)
                 for c_g, c_d in zip(self.server_c, self.clients[idx].delta_c):
                     c_g.data.add_(c_d.data * self.fraction)

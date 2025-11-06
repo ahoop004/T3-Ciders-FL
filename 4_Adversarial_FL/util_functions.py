@@ -102,48 +102,7 @@ def create_data(data_path: str, dataset_name: str):
 
         return train_data, test_data
 
-    if hasattr(datasets, key):
-        if key == "CIFAR10":
-            transform = transforms.Compose(
-                [
-                    transforms.Resize(224),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-                ]
-            )
-        elif key == "MNIST":
-            transform = transforms.Compose(
-                [
-                    transforms.Resize(224),
-                    transforms.Grayscale(num_output_channels=3),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-                ]
-            )
-        else:
-            transform = transforms.Compose(
-                [
-                    transforms.Resize(256),
-                    transforms.CenterCrop(224),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-                ]
-            )
 
-        dataset_cls = datasets.__dict__[key]
-        params = {"download": True}
-        if "train" in dataset_cls.__init__.__code__.co_varnames:
-            params["train"] = True
-            train_data = dataset_cls(root=data_path, transform=transform, **params)
-            params["train"] = False
-            test_data = dataset_cls(root=data_path, transform=transform, **params)
-        else:
-            train_data = dataset_cls(root=data_path, split="train", download=True, transform=transform)
-            test_data = dataset_cls(root=data_path, split="test", download=True, transform=transform)
-    else:
-        raise AttributeError(
-            f'dataset "{original_name}" is not supported or cannot be found in TorchVision Datasets!'
-        )
 
     if hasattr(train_data, "data") and getattr(train_data.data, "ndim", 0) == 3:
         if isinstance(train_data.data, np.ndarray):
@@ -201,15 +160,21 @@ def evaluate_fn(dataloader: DataLoader, model: torch.nn.Module, loss_fn, device:
     running_loss = 0.0
     total = 0
     correct = 0
+    num_batches = 0
 
-    for batch, (images, labels) in enumerate(dataloader):
-        output = model(images.to(device))
-        loss = loss_fn(output, labels.to(device))
-        running_loss += loss.item()
-        total += labels.size(0)
-        correct += (output.argmax(dim=1).cpu().detach() == labels.cpu().detach()).sum().item()
+    with torch.no_grad():
+        for images, labels in dataloader:
+            outputs = model(images.to(device))
+            loss = loss_fn(outputs, labels.to(device))
+            running_loss += loss.item()
+            total += labels.size(0)
+            correct += (outputs.argmax(dim=1).cpu().detach() == labels.cpu().detach()).sum().item()
+            num_batches += 1
 
-    avg_loss = running_loss / (batch + 1)
+    if num_batches == 0:
+        return 0.0, 0.0
+
+    avg_loss = running_loss / num_batches
     acc = 100 * (correct / total)
     return avg_loss, acc
 
