@@ -47,6 +47,7 @@ class Server:
         self.model_class = getattr(self.model_module, model_config["name"])
         self.x = self.model_class(**model_config.get("kwargs", {}))
         self.clients = None
+        self.current_round = 0
     
     def create_clients(self, local_datasets):
 
@@ -107,7 +108,9 @@ class Server:
                
     def update_clients(self, client_ids):
         for idx in client_ids:
-            self.clients[idx].client_update()
+            client = self.clients[idx]
+            client.on_round_start(self.current_round, self.num_rounds)
+            client.client_update()
 
     def server_update(self, client_ids):
         num_participants = len(client_ids)
@@ -125,7 +128,8 @@ class Server:
             for param, a_y in zip(self.x.parameters(), avg_y):
                 param.data = a_y.data
 
-    def step(self):
+    def step(self, round_idx: int):
+        self.current_round = round_idx
         sampled_client_ids = self.sample_clients()
         self.communicate(sampled_client_ids)
         self.update_clients(sampled_client_ids)
@@ -135,9 +139,9 @@ class Server:
 
     def train(self):
         self.results = {"loss": [], "accuracy": []}
-        for round in range(self.num_rounds):
-            logging.info(f"\nCommunication Round:{round+1}")
-            self.step()
+        for round_idx in range(self.num_rounds):
+            logging.info(f"\nCommunication Round:{round_idx+1}")
+            self.step(round_idx)
             test_loss, test_acc = evaluate_fn(self.data,self.x,self.criterion,self.device)
             self.results['loss'].append(test_loss)
             self.results['accuracy'].append(test_acc)

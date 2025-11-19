@@ -7,6 +7,7 @@ This lab focuses on how different optimisation rules behave when training the sa
 ## 1. Algorithms at a Glance
 
 - **FedAvg** – baseline federated averaging; lightweight but sensitive to client drift under skewed data.
+
 - **FedAdam / FedAdagrad / FedYogi** – “FedOpt” variants that apply server-side adaptive steps (Adam, Adagrad, Yogi) while clients still run local SGD. They smooth the aggregated updates using first/second-moment tracking.
 - **SCAFFOLD** – variance-reduction approach that shares control variates between server and clients to counteract drift.
 
@@ -35,6 +36,4 @@ All experiments run on clean data—no adversarial clients in this section.
 
 - Add new algorithms by implementing a server class in `algos.py` and registering it in the notebook’s `ALGORITHM_MAP`.
 - Log extra statistics (gradient norms, client variance) to diagnose why certain optimisers excel or struggle.
-- Combine with Module 4’s adversarial setup if you want to study how each optimiser behaves under poisoning once you understand their clean-baseline dynamics.
 
-Use this notebook side by side with the theory notes to connect the update rules to the empirical behaviour you observe.

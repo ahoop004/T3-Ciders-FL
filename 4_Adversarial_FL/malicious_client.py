@@ -39,9 +39,14 @@ class MaliciousClient(Client):
         self.surrogate_params = self.attack_config.get("surrogate", {})
 
         self.poison_rate = float(self.attack_params.get("poison_rate", 0.0))
+        schedule_cfg = self.attack_params.get("poison_rate_schedule")
+        self.poison_schedule = schedule_cfg if isinstance(schedule_cfg, dict) else None
         self.target_label = self.attack_params.get("target_label")
         if self.poison_rate and self.target_label is None:
             raise ValueError("`target_label` must be provided when poison_rate > 0.")
+        self.start_round = int(self.attack_config.get("start_round", 0))
+        self._current_poison_rate = 0.0
+        self._attack_active = False
 
         self.attack_type = self.attack_params.get("type", "pgd").lower()
         attack_callable = self.attack_params.get("callable")
@@ -84,6 +89,15 @@ class MaliciousClient(Client):
         self.ft_batch_size = int(self.surrogate_params.get("batch_size", default_batch_size))
         self._surrogate_dataset = getattr(local_data, "dataset", None)
         self._early_stop_patience = int(self.surrogate_params.get("early_stop_patience", 0))
+
+    def on_round_start(self, round_idx: int, total_rounds: int) -> None:
+        super().on_round_start(round_idx, total_rounds)
+        if round_idx < self.start_round:
+            self._attack_active = False
+            self._current_poison_rate = 0.0
+            return
+        self._attack_active = True
+        self._current_poison_rate = self._poison_rate_for_round(round_idx, total_rounds)
 
     def _surrogate_loader(self) -> Optional[DataLoader]:
         if self._surrogate_dataset is None:
@@ -133,6 +147,26 @@ class MaliciousClient(Client):
         if best_state is not None:
             self.surrogate.load_state_dict(best_state)
 
+    def _poison_rate_for_round(self, round_idx: int, total_rounds: int) -> float:
+        if not self.poison_schedule:
+            return self.poison_rate
+
+        schedule_type = str(self.poison_schedule.get("type", "linear")).lower()
+        if schedule_type == "constant":
+            return float(self.poison_schedule.get("value", self.poison_rate))
+
+        start = float(self.poison_schedule.get("start", self.poison_rate))
+        end = float(self.poison_schedule.get("end", start))
+        effective_start = max(self.start_round, 0)
+        horizon = max((total_rounds - 1) - effective_start, 1)
+        progress = max(round_idx - effective_start, 0) / horizon
+        progress = min(max(progress, 0.0), 1.0)
+
+        if schedule_type == "linear":
+            return start + (end - start) * progress
+
+        return self.poison_rate
+
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         attack_key = self.attack_type
         kwargs: Dict[str, Any] = {"images": x}
@@ -177,8 +211,9 @@ class MaliciousClient(Client):
                 inputs = inputs.float().to(self.device)
                 labels = labels.long().to(self.device)
 
-                if self.poison_rate > 0.0:
-                    mask = torch.rand(labels.size(0), device=self.device) < self.poison_rate
+                poison_rate = self._current_poison_rate if self._attack_active else 0.0
+                if poison_rate > 0.0:
+                    mask = torch.rand(labels.size(0), device=self.device) < poison_rate
                     if mask.any():
                         clean_inputs = inputs[mask]
                         poison_labels = torch.full_like(labels[mask], int(self.target_label))

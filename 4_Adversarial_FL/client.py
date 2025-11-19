@@ -27,6 +27,10 @@ class Client:
         self.x = None  # type: ignore[attr-defined]
         self.y = None  # type: ignore[attr-defined]
 
+    def on_round_start(self, round_idx: int, total_rounds: int) -> None:
+        """Hook for subclasses that need round context."""
+        _ = (round_idx, total_rounds)
+
     def client_update(self) -> None:
         if self.x is None:
             raise ValueError("Client model `x` has not been initialised by the server.")
