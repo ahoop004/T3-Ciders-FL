@@ -19,7 +19,7 @@ algorithms:
     fed_config:
       fraction_clients: 0.1
       num_clients: 100
-      num_rounds: 1
+      num_rounds: 5
       num_epochs: 5
       batch_size: 64
       global_stepsize: 0.1
@@ -31,7 +31,7 @@ algorithms:
     fed_config:
       fraction_clients: 0.1
       num_clients: 100
-      num_rounds: 1
+      num_rounds: 5
       num_epochs: 5
       batch_size: 64
       global_stepsize: 0.1
@@ -44,7 +44,7 @@ algorithms:
     fed_config:
       fraction_clients: 0.1
       num_clients: 100
-      num_rounds: 1
+      num_rounds: 5
       num_epochs: 5
       batch_size: 64
       global_stepsize: 0.1
@@ -59,7 +59,7 @@ algorithms:
     fed_config:
       fraction_clients: 0.1
       num_clients: 100
-      num_rounds: 1
+      num_rounds: 5
       num_epochs: 5
       batch_size: 64
       global_stepsize: 0.1
@@ -72,7 +72,7 @@ algorithms:
     fed_config:
       fraction_clients: 0.1
       num_clients: 100
-      num_rounds: 1
+      num_rounds: 5
       num_epochs: 5
       batch_size: 64
       global_stepsize: 0.1
