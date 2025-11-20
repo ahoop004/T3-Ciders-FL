@@ -139,13 +139,21 @@ class BaseServer:
         if not self.clients or self.test_loader is None:
             raise RuntimeError("Server.setup() must be called before train().")
 
-        for _ in range(self.num_rounds):
+        for round_idx in range(self.num_rounds):
             selected = self.sample_clients()
+            print(
+                f"[{self.__class__.__name__}] Round {round_idx + 1}/{self.num_rounds} "
+                f"→ selected {len(selected)} clients, {self.num_epochs} local epoch(s)"
+            )
             local_states = self.collect_client_updates(selected)
             self.aggregate(local_states)
             loss, acc = evaluate_fn(self.test_loader, self.global_model, self.criterion, self.device)
             self.results["loss"].append(loss)
             self.results["accuracy"].append(acc)
+            print(
+                f"[{self.__class__.__name__}] Round {round_idx + 1} complete → "
+                f"loss {loss:.4f}, accuracy {acc:.2f}%"
+            )
 
     def sample_clients(self) -> Sequence[int]:
         count = max(int(self.client_fraction * self.num_clients), 1)
