@@ -178,7 +178,11 @@ class BaseServer:
         num = len(states)
         for key in states[0]:
             stacked = torch.stack([state[key] for state in states], dim=0)
-            avg[key] = stacked.mean(dim=0)
+            if torch.is_floating_point(stacked) or torch.is_complex(stacked):
+                avg[key] = stacked.mean(dim=0)
+            else:
+                # Non-floating buffers (e.g., BatchNorm counters) should be copied verbatim.
+                avg[key] = stacked[0].clone()
         return avg
 
     def _zeros_like_global(self) -> StateDict:
