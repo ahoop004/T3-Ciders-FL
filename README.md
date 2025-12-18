@@ -1,20 +1,21 @@
-# Federated Learning Workshop
+# Federated Learning Workshop (T3-Ciders-FL)
 
-A five-module journey through federated learning (FL): from the basics of client/server training, to data heterogeneity, optimisation algorithms, adversarial poisoning, and defensive techniques. Each module stands alone, but the sequence builds a coherent narrative for classrooms, workshops, or self-study.
+A modular federated learning (FL) workshop that moves from the FL control loop, to non-IID client data, to federated optimizers, to adversarial poisoning.
+
+**Where to run:** we run the notebooks on the **ODU HPC (Wahab) via Open OnDemand**. (Detailed HPC steps are in the accompanying slides.)
+
 
 ---
 
 ## Table of Contents
 - [Quickstart](#quickstart)
 - [Module Overview](#module-overview)
-  - [Module 1 — FL Foundations](#module-1--fl-foundations)
-  - [Module 2 — Data Heterogeneity](#module-2--data-heterogeneity)
-  - [Module 3 — Optimisation Algorithms](#module-3--optimisation-algorithms)
-  - [Module 4 — Adversarial Surrogates & Poisoning](#module-4--adversarial-surrogates--poisoning)
-  - [Module 5 — Defensive FL](#module-5--defensive-fl)
 - [Repository Layout](#repository-layout)
 - [Prerequisites](#prerequisites)
+- [Configuration Notes](#configuration-notes)
+- [Contributing](#contributing)
 - [License](#license)
+
 
 ---
 
@@ -30,10 +31,20 @@ pip install torch torchvision matplotlib numpy pyyaml
 Then open the notebook for the module you want to explore, for example:
 
 ```bash
-jupyter notebook 4_Adversarial_FL/Adversarial_FL_Lab.ipynb
+# Module 1
+jupyter notebook 1_FL_Intro/FL_intro.ipynb
+
+# Module 2
+jupyter notebook 2_IID_Concepts/Non_iid.ipynb
+
+# Module 3
+jupyter notebook 3_Algorithms/Algorithms.ipynb
+
+# Module 4
+jupyter notebook 4_Adversarial_FL/Adv_FL.ipynb
+
 ```
 
-Each lab includes a configuration file (`lab_config.yaml`) so you can tweak hyperparameters without editing code.
 
 ---
 
@@ -41,29 +52,39 @@ Each lab includes a configuration file (`lab_config.yaml`) so you can tweak hype
 
 ### Module 1 — FL Foundations
 Minimal notebook to demystify the FL control loop.
-- Build a tiny CNN on MNIST, run local updates, aggregate on the server.
-- Inspect logs/metrics to see how client progress translates to global accuracy.
+- Train a small CNN (MNIST)
+- Run local client updates
+- Aggregate on the server (FedAvg)
+- Track global accuracy/loss across rounds
 
-### Module 2 — Data Heterogeneity
-Focus on client data distributions.
-- Generate IID and Dirichlet-skewed splits.
-- Visualise how heterogeneity alters convergence and fairness.
+Notebook: `1_FL_Intro/FL_intro.ipynb`
 
-### Module 3 — Optimisation Algorithms
-Compare common FL optimisers on a shared workload.
-- Run FedAvg, FedAdagrad, FedAdam, FedYogi, and SCAFFOLD from a single notebook.
-- Log round-by-round accuracy and loss, export metrics for downstream analysis.
+### Module 2 — Data Heterogeneity (Non-IID)
+Focus on client data distributions and why non-IID matters.
+- Generate IID vs Dirichlet-skewed splits
+- Visualize client label distributions
+- Compare FedAvg convergence under increasing skew
+
+Notebook: `2_IID_Concepts/Non_iid.ipynb`
+
+### Module 3 — Optimisation Algorithms (FedOpt + SCAFFOLD)
+Compare federated optimizers on a shared workload.
+- FedAvg, FedAdagrad, FedAdam, FedYogi, SCAFFOLD
+- Plot accuracy/loss trajectories side-by-side
+
+Notebook: `3_Algorithms/Algorithms.ipynb`
 
 ### Module 4 — Adversarial Surrogates & Poisoning
-Tell the story of an attacker without perfect model knowledge.
-- **Attack objectives:** class-targeted backdoors vs. global performance degradation.
-- **Knowledge settings:** white-box (exact architecture) vs. black-box (only snapshots). We emphasise black-box attacks via a MobileNetV2 surrogate that mimics the target MobileNetV3.
-- **Workflow:** train the clean baseline, fine-tune the surrogate, craft PGD/FGSM/random-noise perturbations, and deploy them to poison federated rounds. Compare clean vs. poisoned trajectories and participation logs.
+Model black-box adversaries using surrogate models and standard attacks.
+- Target vs surrogate (e.g., MobileNetV3 target, MobileNetV2 surrogate)
+- Random noise, FGSM, PGD
+- Compare clean vs attacked behavior and (optionally) FL poisoning dynamics
 
-### Module 5 — Defensive FL
-Introduce countermeasures once you have seen the attacks.
-- Implement and benchmark defences such as trimmed mean, Krum, anomaly scoring, or robust aggregation variants.
-- Reuse the attack scripts from Module 4 to quantify trade-offs.
+Notebook: `4_Adversarial_FL/Adv_FL.ipynb`
+
+### Module 5 — Defensive FL (WIP)
+Defensive baselines and robust aggregation.
+Directory: `5_Defensive_FL/`
 
 ---
 
@@ -71,26 +92,45 @@ Introduce countermeasures once you have seen the attacks.
 
 ```
 .
-├── 1_FL_Intro/           # Module 1 notebooks & helpers
-├── 2_IID_Concepts/       # Module 2 notebooks for data splits
-├── 3_Algorithms/         # Module 3 optimisation comparisons
-├── 4_Adversarial_FL/     # Module 4 surrogate-poisoning lab
-├── 5_Defensive_FL/       # Module 5 defensive baselines
-├── fed_go_through/       # Auxiliary utilities / scratch space
-├── README.md
-└── T3-FL.drawio          # Diagram summarising module flow
+├── 1_FL_Intro/ # Module 1 notebooks & helpers
+├── 2_IID_Concepts/ # Module 2 notebooks for data splits
+├── 3_Algorithms/ # Module 3 optimisation comparisons
+├── 4_Adversarial_FL/ # Module 4 surrogate / adversarial lab
+├── 5_Defensive_FL/ # Module 5 defensive baselines (WIP)
+├── fed_go_through/ # Utilities / scratch space
+├── T3-FL.drawio # Diagram summarising module flow
+└── README.md
 ```
 
 ---
-
 ## Prerequisites
 
-- Python ≥ 3.10 with `torch`, `torchvision`, `matplotlib`, `numpy`, and `pyyaml`.
-- GPU strongly recommended for Modules 3–5; Imagenette downloads automatically when needed.
-- Familiarity with Jupyter notebooks and basic PyTorch will help you move faster.
+- Python ≥ 3.10
+- Jupyter (Notebook or Lab)
+- PyTorch + torchvision
+- numpy, matplotlib, pyyaml
+
+Recommended:
+- GPU for Modules 3–4
+- A scratch/work directory for datasets and outputs (especially on HPC)
 
 ---
 
+## Configuration Notes
+
+- Modules 1–2: most hyperparameters are defined directly in the notebook cells.
+- Modules 3–4: use `config.yaml` in the module directory for experiment settings (so you can tweak runs without editing core code).
+
+If a module directory includes its own README, follow that module’s README first.
+
+## Contributing
+
+Issues and pull requests are welcome.
+If you add a new module:
+- keep it self-contained (README + notebook),
+- list its notebook path in the Module Overview above,
+- and include a small “Suggested Experiments” section.
+
 ## License
 
-See [LICENSE](LICENSE) for details. Contributions and improvements are welcome—open an issue or submit a pull request if you build additional modules or enhancements.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
