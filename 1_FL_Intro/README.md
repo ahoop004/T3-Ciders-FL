@@ -25,6 +25,11 @@ Federated Learning is a machine learning approach that enables model training ac
 Figure from: https://www.linkedin.com/pulse/federated-learning-healthcare-part-1-saber-ghadakzadeh-md-msc-phd/
 <center> 
 
+### Who/what is a “client” in FL?
+
+A **client** is any participant that holds data locally and can compute updates:
+- **Cross-device FL:** millions of phones / IoT devices (each device is a client)
+- **Cross-silo FL:** a small number of **organizations/corporations** (e.g., hospitals, banks, companies, data centers) where each institution is a client
 
 
 ### Key Principle
@@ -56,9 +61,9 @@ Figure from: https://7wdata.be/big-data/building-the-machine-learning-infrastruc
 
 ### Federated Learning Approach
 
-Federated Learning reverses this process:
+Federated Learning changes the training workflow so data stays local and only model updates move:
 
-1. **Model Distribution:** A global model is distributed to multiple devices/organizations
+1. **Model Distribution:** A global model is distributed to multiple devices or organizations/corporations (cross-device vs. cross-silo FL)
 2. **Local Training:** Each participant trains the model on their local data
 3. **Model Aggregation:** Only model updates (not raw data) are sent back to the central server
 4. **Global Update:** The central server aggregates these updates to improve the global model
