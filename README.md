@@ -21,9 +21,9 @@ A five-module journey through federated learning (FL): from the basics of client
 ## Quickstart
 
 ```bash
-git clone https://github.com/aaron/T3-Ciders-FL.git
+git clone https://github.com/ahoop004/T3-Ciders-FL.git
 cd T3-Ciders-FL
-python -m venv .venv && source .venv/bin/activate
+
 pip install torch torchvision matplotlib numpy pyyaml
 ```
 
