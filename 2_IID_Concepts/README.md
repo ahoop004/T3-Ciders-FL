@@ -1,29 +1,52 @@
-# Section 2: Non-IID Data & Dirichlet Partitioning
-![IID image](iid_1.png)
-Hellström, Henrik & Silva, José & Fodor, Viktoria & Fischione, Carlo. (2020). Wireless for Machine Learning. 10.48550/arXiv.2008.13492. 
+# Module 2 — Non-IID Data & Dirichlet Partitioning
+
+This module explains why client data in federated learning is rarely IID and how non-IID data impacts FedAvg training.
+
+**Notebook:** `2_IID_Concepts/Non_iid.ipynb`  
+**Where to run:** ODU HPC (Wahab via Open OnDemand).
+
+
+---
+## Learning objectives
+
+By the end of this module, students should be able to:
+1. Define IID vs non-IID data in the federated learning setting.
+2. Describe common types of client heterogeneity (label skew, covariate shift, quantity skew, drift).
+3. Explain Dirichlet partitioning and how the concentration parameter controls skew.
+4. Visualize client label distributions and interpret what they imply for training.
+5. Observe and explain how increasing non-IID severity affects FedAvg convergence and final accuracy.
+
+---
 ## Motivation
 
-In real federated learning systems, clients hold datasets from distinct environments (users, devices, hospitals, regions). Thus their local data distributions are rarely IID.  
-This heterogeneity causes optimization interference, slower convergence, degraded global accuracy, and “client drift.”  
-We simulate non-IID to help students see these effects in controlled experiments.
+In real federated learning systems, clients hold data from different environments (users, devices, hospitals, regions, or corporations).  
+As a result, local client distributions often differ from the global distribution.[2][17]
+
+This notebook simulates non-IID data so students can observe:
+- slower convergence,
+- degraded global accuracy,
+- higher variance across rounds,
+- and “client drift” behavior during aggregation.
+
 
 ---
 
-## IID vs Non-IID: Definitions & Types of Heterogeneity
+## IID vs Non-IID: definitions & types of heterogeneity
 
-- **IID (Independent & Identically Distributed)**  
-  All clients sample from the same joint distribution $P(x, y)$. Each client’s local set is an unbiased random subset of the global data.
+### IID (Independent & Identically Distributed)
+All clients sample from the same joint distribution \(P(x, y)\).  
+Each client dataset is an unbiased random subset of the global dataset.
 
-- **Non-IID**  
-  Client-specific distributions differ. Variations arise along these axes:
+### Non-IID
+Client-specific distributions differ.[2] Common sources of heterogeneity include:
+1. **Label distribution skew:** clients have different proportions of classes.
+2. **Covariate shift:** for the same label, feature distributions differ across clients.
+3. **Concept shift / drift:** \(P(y \mid x)\) varies by client or changes over time.
+4. **Quantity skew:** clients have different dataset sizes.
+5. **Temporal drift / nonstationarity:** distributions shift over time.
 
-  1. **Label distribution skew**: clients have different proportions of classes.  
-  2. **Covariate (feature) shift**: for the same class, feature distributions differ by client.  
-  3. **Concept shift / drift**: $P(y \mid x)$ is client-dependent.  
-  4. **Quantity skew**: clients have different dataset sizes.  
-  5. **Temporal drift / nonstationarity**: distributions shift over time.
+**In this module:** we focus on **label distribution skew**.
 
-In this section / notebook, we focus on *label distribution skew* via Dirichlet partitioning.
 ![split](tutorial-visualize-label-distribution_9_0.png)
 
 [Flower Distribution Tutorial](https://flower.ai/docs/datasets/tutorial-visualize-label-distribution.html)
@@ -32,95 +55,117 @@ In this section / notebook, we focus on *label distribution skew* via Dirichlet 
 
 ---
 
-## Dirichlet Partitioning: Intuition & Formalism
+## Dirichlet partitioning: intuition & procedure
 
 ### Intuition
+Dirichlet partitioning gives a tunable way to assign class proportions across clients.[13][18]
 
-We want a tunable, smooth method to assign class proportions across clients.  
-The Dirichlet distribution gives random class-mix vectors whose concentration is controlled by a parameter $\alpha$.  
-A small $\alpha$ leads to sharply skewed mixing (clients specialize); a large $\alpha$ yields more uniform mixes (closer to IID).
+- **Small \(\alpha\)** → strongly skewed client label mixtures (clients “specialize”)
+- **Large \(\alpha\)** → more uniform mixtures (closer to IID)
 
-### Formal method
-
+### Procedure (label-skew)
 Let:
+- \(K\) = number of classes  
+- \(N\) = number of clients  
+- \(\alpha > 0\) = Dirichlet concentration parameter
 
-- $K$ = number of classes (labels).  
-- $N$ = number of clients.  
-- $\alpha$ = concentration parameter (scalar or vector).  
+For each class \(k \in \{1,\dots,K\}\):
+1. Sample a probability vector across clients  
+   \[
+   \mathbf{p}_k = (p_{k,1}, \dots, p_{k,N}) \sim \text{Dirichlet}(\alpha \cdot \mathbf{1})
+   \]
+ reminder: \(\sum_i p_{k,i} = 1\)
 
-Procedure:
+2. Allocate approximately \(p_{k,i}\cdot n_k\) samples of class \(k\) to client \(i\)
 
-1. For each class $k = 1,\dots,K$, draw  
-   $ \mathbf{p}_k = (p_{k,1}, p_{k,2}, \dots, p_{k,N})$ $ \sim \mathrm{Dirichlet}(\alpha, \alpha, \dots, \alpha)$
-   so that $\sum_i p_{k,i} = 1$.  
+3. Enforce basic constraints (e.g., minimum samples per client) if needed
 
-2. Let $n_k$ = number of samples of class $k$ in the global dataset.  
-   Assign $ \lfloor p_{k,i} \cdot n_k \rfloor $ (or nearest integer) samples of class $k$ to client $i$.  
-
-3. Enforce minimal sample constraints: if any client ends with zero of a class or too few total samples, resample or reallocate.  
-
-4. Optionally, use *self-balancing* (in implementations) to prevent extreme imbalance: once a client’s total exceeds average, skip further allocation to it. (See Flower’s DirichletPartitioner) 
-
-This yields a per-client label mixture that is random but controlled by $\alpha$.
-
----
-
-## Role of $\alpha$: Degree of Heterogeneity
-
-- $\alpha \to 0$: extreme heterogeneity. Each class is heavily concentrated to few clients.  
-- $\alpha = 1$: moderate heterogeneity.  
-- $\alpha \gg 1$: distributions converge toward uniform, approximating IID.  
-
-In your notebook, vary $\alpha$ (e.g. 0.01, 0.1, 1.0, 10) and plot histograms of class proportions per client to show the taper.
-
----
-
-## Effects of Non-IID on Federated Training
-
-- **Client drift / conflicting updates**  
-  Clients optimize toward different local optima. Their gradient or parameter updates may conflict during aggregation.
-
-- **Slower convergence / divergence**  
-  The more heterogeneous the data, the worse vanilla FedAvg performs. Experimental studies confirm this. 
-
-- **Bias / degradation**  
-  The global model may overfit to classes common across clients or skew toward clients with larger or “easier” distributions.
-
-- **Imbalance of update magnitudes**  
-  Clients with more or “dominant” classes may produce large updates, influencing aggregation disproportionately.
-
-- **Non-uniform local losses**  
-  Some clients’ local models may stagnate or diverge.
-
----
-
-## Mitigation Strategies (Survey)
-
-Here is a non-exhaustive list of algorithmic approaches to handle non-IID:
-
-| Method | Key Idea | Pros / Use Cases |
-|---|---|---|
-| **FedProx** | Add proximal regularization between local and global models | Limits drift |
-| **SCAFFOLD** | Use control variates to correct client drift | Good in high heterogeneity |
-| **FedDyn** | Dynamic regularization to align local/global objectives | More stable convergence |
-| **FedDC** | Track local drift and correct updates | Effective in non-IID settings |
-| **Client clustering / personalization** | Partition clients into clusters or adapt local personalization | Tailors models per cluster  |
-| **Regularization / drift learning** | Penalize drift direction (e.g. Learning from Drift)  | Reduces harmful deviation |
-
----
-
-## Relation to Notebook
-
-In your notebook, students will:
-
-1. Implement or use a Dirichlet-based partitioning routine.  
-2. Vary $\alpha$ levels to simulate degrees of skew.  
-3. Visualize class-distribution histograms by client.  
-4. Run federated training (e.g. FedAvg) under these partition settings.  
-5. Observe and compare metrics: global test accuracy, per-client losses, convergence curves.  
-6. Reflect: at what $\alpha$ does FL “break”?
+This produces realistic non-IID label distributions while letting you control severity using \(\alpha\).
 
 
 ---
+
+## Role of \(\alpha\): degree of heterogeneity
+
+As a rule of thumb[13]:
+- \(\alpha \to 0\): extreme heterogeneity (high skew)
+- \(\alpha \approx 1\): moderate heterogeneity
+- \(\alpha \gg 1\): approaches IID
+
+**Notebook note:** if the notebook exposes a convenience knob (e.g., `non_iid_per`), document how it maps to \(\alpha\) in your implementation.
+
+
+---
+
+## Expected effects of non-IID on federated training
+
+When heterogeneity increases, students should expect [14] [15] [16]:
+- **Client drift / conflicting updates:** local updates move in different directions
+- **Slower convergence:** more rounds needed to reach a given accuracy
+- **Lower final accuracy:** the global model may underperform compared to IID
+- **Uneven learning:** some clients improve quickly while others stagnate
+
+
+---
+
+## Relation to the notebook (what students will do)
+
+In `Non_iid.ipynb`, students will:
+
+1. Create IID and Dirichlet-based non-IID partitions across clients  
+2. Vary \(\alpha\) (or the notebook’s non-IID knob) to change skew severity  
+3. Visualize per-client label distributions (histograms/heatmaps)  
+4. Run FedAvg training under multiple partition settings  
+5. Compare global metrics across rounds (accuracy/loss) and discuss where/why performance degrades
+
+
+
+---
+
+## Suggested experiments
+
+Run at least two comparisons:
+
+1. **IID vs non-IID:** compare convergence curves and final accuracy  
+2. **Sweep \(\alpha\):** try \(\alpha \in \{0.01, 0.1, 1.0, 10\}\) and compare distributions + results  
+3. **Client participation:** keep \(\alpha\) fixed and vary the fraction of clients per round  
+4. **Local epochs:** increase local epochs and observe whether drift becomes worse in non-IID settings
+
+---
+
+## Mitigation strategies (preview)
+
+Non-IID performance issues motivate methods such as:
+- FedProx (proximal regularization)[15]
+- SCAFFOLD (control variates)[14]
+<!-- - dynamic regularization approaches (e.g., FedDyn)
+- personalization / clustering strategies -->
+
+These are explored more directly in later modules.
+---
+
+## References
+
+## References
+
+[1] McMahan et al. *Communication-Efficient Learning of Deep Networks from Decentralized Data* (AISTATS 2017). https://proceedings.mlr.press/v54/mcmahan17a.html  
+[2] Kairouz et al. *Advances and Open Problems in Federated Learning* (arXiv:1912.04977). https://arxiv.org/abs/1912.04977  
+[3] Bonawitz et al. *Practical Secure Aggregation for Privacy-Preserving Machine Learning* (ePrint 2017/281). https://eprint.iacr.org/2017/281  
+[4] Rieke et al. *The future of digital health with federated learning* (npj Digital Medicine, 2020). https://doi.org/10.1038/s41746-020-00323-1  
+[5] Hard et al. *Federated Learning for Mobile Keyboard Prediction* (arXiv:1811.03604). https://arxiv.org/abs/1811.03604  
+[6] Zheng et al. *Federated Meta-Learning for Fraudulent Credit Card Detection* (IJCAI 2020). https://doi.org/10.24963/ijcai.2020/642  
+[7] GDPR (EUR-Lex). *Regulation (EU) 2016/679* (GDPR) — Article 44 “General principle for transfers”. https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng  
+[8] California DOJ. *California Consumer Privacy Act (CCPA)* overview. https://oag.ca.gov/privacy/ccpa  
+[9] U.S. HHS. *The HIPAA Privacy Rule* overview. https://www.hhs.gov/hipaa/for-professionals/privacy/index.html  
+[10] U.S. FTC. *How to Comply with the Privacy of Consumer Financial Information Rule (GLBA)*. https://www.ftc.gov/tips-advice/business-center/guidance/how-comply-privacy-consumer-financial-information-rule-gramm  
+[11] Pew Research Center. *Americans and Privacy: Concerned, Confused and Feeling Lack of Control Over Their Personal Information* (2019). https://www.pewresearch.org/internet/2019/11/15/americans-and-privacy-concerned-confused-and-feeling-lack-of-control-over-their-personal-information/  
+[12] IETF Internet-Draft. *Definition of End-to-end Encryption* (draft-knodel-e2ee-definition). https://datatracker.ietf.org/doc/html/draft-knodel-e2ee-definition-11  
+
+[13] Flower Datasets. *DirichletPartitioner (alpha-controlled label skew partitioning)*. https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.DirichletPartitioner.html  
+[14] Karimireddy et al. *SCAFFOLD: Stochastic Controlled Averaging for Federated Learning* (ICML 2020). https://proceedings.mlr.press/v119/karimireddy20a.html  
+[15] Li et al. *Federated Optimization in Heterogeneous Networks (FedProx)* (MLSys 2020). https://proceedings.mlsys.org/paper_files/paper/2020/hash/1f5fe83998a09396ebe6477d9475ba0c-Abstract.html  
+[16] Zhao et al. *Federated Learning with Non-IID Data* (arXiv:1806.00582, 2018). https://arxiv.org/abs/1806.00582  
+[17] Li et al. *Federated Learning on Non-IID Data Silos: An Experimental Study* (ICDE 2022). https://doi.org/10.1109/ICDE53745.2022.00077  
+[18] Yurochkin et al. *Bayesian Nonparametric Federated Learning of Neural Networks* (arXiv:1905.12022, 2019). https://arxiv.org/abs/1905.12022  
 
 
