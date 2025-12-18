@@ -1,135 +1,164 @@
-# Section 3: Federated Optimisation Algorithms
+# Module 3 — Federated Optimization Algorithms (FedAvg, FedOpt, SCAFFOLD)
 
-This lab focuses on how different optimisation rules behave when training the same federated task. You will compare **FedAvg**, **FedAdam**, **FedAdagrad**, **FedYogi**, and **SCAFFOLD** on identical Imagenette splits to see how their dynamics diverge.
+This lab compares how different **server-side optimization rules** behave on the same federated task.
+You will compare **FedAvg**, **FedAdagrad**, **FedAdam**, **FedYogi**, and **SCAFFOLD** using identical data/model settings.
 
----
-
-## 1. Algorithms at a Glance
-
-- **FedAvg** – baseline federated averaging; lightweight but sensitive to client drift under skewed data.
-
-- **FedAdam / FedAdagrad / FedYogi** – “FedOpt” variants that apply server-side adaptive steps (Adam, Adagrad, Yogi) while clients still run local SGD. They smooth the aggregated updates using first/second-moment tracking.
-- **SCAFFOLD** – variance-reduction approach that shares control variates between server and clients to counteract drift.
+**Notebook:** `3_Algorithms/Algorithms.ipynb`  
+**Where to run:** ODU HPC (Wahab via Open OnDemand).  
+**Supplemental slides:** `3_Algorithms/algos.pdf` (formulas + pseudocode).
 
 ---
 
-## 2. Notebook Walkthrough
+## Learning objectives
 
-1. **Configuration & seeding** – load `config.yaml`, set the RNG seeds, and collect shared data/model settings.
-2. **Algorithm runner** – map algorithm names to their server classes and define a helper that trains once and returns the per-round history.
-3. **Execution sweep** – run every configured optimiser and capture final loss/accuracy along with the convergence traces.
-4. **Visual comparison** – plot accuracy vs. communication rounds to highlight differences in speed and stability, then review the summary table of final metrics.
-
-All experiments run on clean data—no adversarial clients in this section.
-
----
-
-## 3. Suggested Experiments
-
-- **Hyperparameter sensitivity** – adjust server learning rates, adaptive betas/epsilons, or the local learning rate to see how each optimiser reacts.
-- **Data heterogeneity** – increase `non_iid_per` in `config.yaml` or reduce the participating fraction to stress-test drift handling.
-- **Local work vs. communication** – change the number of local epochs or batch size to study convergence trade-offs.
+By the end of this module, students should be able to:
+1. Explain what changes between **FedAvg** and **FedOpt**-style methods (server-side adaptive steps).
+2. Describe the purpose of **server momentum / second-moment tracking** (FedAdam/FedYogi/FedAdagrad).
+3. Explain **client drift** and how **SCAFFOLD** reduces it using control variates.
+4. Run a controlled comparison of algorithms and interpret **accuracy/loss vs communication rounds**.
+5. Identify which hyperparameters matter most (server LR, betas/eps, local LR, local epochs, client fraction).
 
 ---
 
-## 4. Extending the Lab
+## Motivation
 
-- Add new algorithms by implementing a server class in `algos.py` and registering it in the notebook’s `ALGORITHM_MAP`.
-- Log extra statistics (gradient norms, client variance) to diagnose why certain optimisers excel or struggle.
-- Combine with Module 4’s adversarial setup if you want to study how each optimiser behaves under poisoning once you understand their clean-baseline dynamics.
+FedAvg is often a strong baseline, but it can be:
+- sensitive to non-IID client data (drift),
+- sensitive to hyperparameter choices,
+- slower or less stable under heterogeneity.
 
-Use this notebook side by side with the theory notes to connect the update rules to the empirical behaviour you observe.
+FedOpt methods (FedAdam/FedYogi/FedAdagrad) and SCAFFOLD are designed to improve stability and convergence under these conditions.
+
+This module provides a clean baseline comparison (no adversarial clients here).
+---
+## Optimizer intuition (why “moments” matter)
+
+Many FL algorithms in this module differ mainly in **how the server updates the global model** after receiving client updates.
+
+### Gradient descent (baseline idea)
+A gradient tells us which direction increases the loss; we step *against* it to reduce the loss.
+
+### Momentum = “first moment” (EMA of gradients)
+Momentum keeps an exponentially-weighted moving average of past gradients to smooth noise and help updates move consistently in one direction.
+
+### Adaptive scaling = “second moment” (EMA of squared gradients)
+Adaptive methods also track a moving average of squared gradients. Parameters with consistently large gradients get smaller effective step sizes; parameters with small/rare gradients get relatively larger steps.
+
+### What changes in FedOpt (Module 3)
+Clients still do local training, but the **server** uses adaptive-optimizer logic (Adagrad/Adam/Yogi-style) to apply aggregated updates more effectively—often improving tuning and stability under heterogeneity. [19]
+
+(See: Adagrad [20], Adam [21], and FedOpt [19].)
 
 ---
 
-## 5. Reference Material from `alog.pdf`
+## Algorithms at a glance
 
-The legacy Module 3 slide deck (`alog.pdf`) now sits in this directory. Use it to supplement the notebook with formal definitions, formulas, and code snippets for every optimiser.
+### FedAvg (baseline)
+Clients run local training, then the server aggregates/averages client updates to form the next global model.
 
-### 5.1 Base FL Vocabulary
+### FedAdagrad / FedAdam / FedYogi (FedOpt family)
+Clients still run local training, but the **server update** uses adaptive optimization logic:
+- **FedAdagrad:** accumulated squared gradients (per-parameter scaling)
+- **FedAdam:** momentum + second-moment estimates (Adam-style)
+- **FedYogi:** second-moment update designed to be more stable under some settings than Adam
 
-See the **“Base Federated Learning Vocabulary”** slide for quick definitions of terms such as *client*, *server*, *local update*, *global model*, *communication round*, *non-IID*, and *privacy preservation*. It is a handy glossary for new participants.
+These methods often reduce tuning pain and improve convergence under heterogeneity.
 
-### 5.2 FedAvg (Slides “FedAvg”)
-
-FedAvg couples local SGD with server averaging:
-
-```math
-w_{t+1}^{(k)} = w_t - \eta \nabla \ell_k(w_t), \qquad
-w_{t+1} = \sum_{k \in S_t} \frac{n_k}{\sum_{j \in S_t} n_j}\, w_{t+1}^{(k)}
-```
-
-The PDF’s code fragment mirrors the implementation in `algos.py`:
-
-```python
-grads = torch.autograd.grad(loss, self.y.parameters())
-with torch.no_grad():
-    for param, grad in zip(self.y.parameters(), grads):
-        param.data -= self.lr * grad.data
-```
-
-and the server aggregation step:
-
-```python
-with torch.no_grad():
-    for a_y, y in zip(avg_y, self.clients[idx].y.parameters()):
-        a_y.data.add_(y.data / num_participants)
-    for param, a_y in zip(self.x.parameters(), avg_y):
-        param.data = a_y.data
-```
-
-### 5.3 FedAdagrad / FedAdam / FedYogi (Slides “Adaptive Federated Optimization Vocab”, “FedAdagrad”, “FedAdam”, “FedYogi”)
-
-The FedOpt slides recap the adaptive moment logic:
-
-```math
-s_t = s_{t-1} + g_t^2,\qquad
-m_t = \beta_1 m_{t-1} + (1-\beta_1) g_t,\qquad
-v_t = \beta_2 v_{t-1} + (1-\beta_2) g_t^2
-```
-
-which translate to the code snippets shown in the deck:
-
-```python
-# FedAdagrad accumulator
-s.data += torch.square(g.data)
-p.data += self.lr * g.data / torch.sqrt(s.data + self.epsilon)
-
-# FedAdam / FedYogi base updates
-m.data = self.beta1 * m.data + (1 - self.beta1) * g.data
-v.data = self.beta2 * v.data + (1 - self.beta2) * torch.square(g.data)
-m_bias_corr = m / (1 - self.beta1 ** self.timestep)
-v_bias_corr = v / (1 - self.beta2 ** self.timestep)
-p.data += self.lr * m_bias_corr / (torch.sqrt(v_bias_corr) + self.epsilon)
-```
-
-FedYogi replaces the second-moment line with the damped difference that appears on its slide:
-
-```python
-v.data = v.data + (1 - self.beta2) * torch.sign(torch.square(g.data) - v.data) * torch.square(g.data)
-```
-
-Use the “Adaptive Federated Optimization” vocabulary list when introducing concepts like *bias correction*, *momentum*, *gradient scaling*, or *client drift* mitigation.
-
-### 5.4 SCAFFOLD (Slides “SCAFFOLD Vocab” and “Scaffold…”)
-
-The deck emphasises SCAFFOLD’s control variates:
-
-```python
-for param, grad, s_c, c_c in zip(self.y.parameters(), grads, self.server_c, self.client_c):
-    param.data -= self.lr * (grad.data + (s_c.data - c_c.data))
-```
-
-and the update of client/server control states:
-
-```python
-a = ceil(len(self.data.dataset) / self.data.batch_size) * self.num_epochs * self.lr
-for n_c, c_l, c_g, diff in zip(new_client_c, self.client_c, self.server_c, delta_y):
-    n_c.data += c_l.data - c_g.data - diff.data / a
-```
-
-Those slides also define vocabulary such as *control variates*, *drift correction*, and *variance reduction*, which you can quote directly in the lab instructions.
+### SCAFFOLD
+Adds **control variates** (server + per-client) to correct local update bias caused by non-IID data (“client drift”).
 
 ---
 
-Keep `alog.pdf` open while you work through the notebook so you can quickly reference the derivations, pseudo-code, and definitions captured from the original module.
+## Notebook walkthrough (what students will do)
+
+In `Algorithms.ipynb`, students will:
+
+1. **Configuration & seeding**
+   - Load `config.yaml`
+   - Set RNG seeds and shared dataset/model settings
+
+2. **Algorithm runner**
+   - Map algorithm names → server classes (e.g., `ALGORITHM_MAP`)
+   - Train one algorithm and return per-round `history`
+
+3. **Execution sweep**
+   - Run all configured algorithms under the *same* conditions
+   - Collect per-round accuracy/loss and final metrics
+
+4. **Visual comparison**
+   - Plot accuracy vs communication rounds (and loss if available)
+   - Compare speed, stability, and final performance
+
+---
+
+## Configuration notes
+
+This module is controlled primarily via `3_Algorithms/config.yaml`.
+
+Common knobs to test:
+- `num_clients`, `fraction` (client participation)
+- `local_epochs`, `local_lr`
+- `rounds`
+- FedOpt-specific: `server_lr`, `beta1`, `beta2`, `epsilon` (as implemented)
+
+Goal: keep everything fixed except the variable you are studying.
+
+---
+
+## Suggested experiments
+
+Run at least two:
+
+1. **Baseline comparison**
+   - Run FedAvg, FedAdam, FedYogi, FedAdagrad, SCAFFOLD with the default config
+   - Compare accuracy vs rounds
+
+2. **Heterogeneity stress test**
+   - Increase non-IID severity (if your config supports it)
+   - Re-run and observe which methods are most stable
+
+3. **Client participation**
+   - Compare `fraction = 0.1` vs `0.5`
+   - Observe variance and convergence speed
+
+4. **Local work vs communication**
+   - Change `local_epochs` (e.g., 1 vs 5)
+   - Observe whether more local training helps or increases drift
+
+---
+
+## Extending the lab
+
+- Add a new method by implementing a server class (e.g., in `algos.py`) and registering it in the notebook’s algorithm map.
+- Log additional diagnostics (optional):
+  - update norms, gradient norms,
+  - client-to-client update variance,
+  - per-round time cost.
+
+---
+
+## References
+
+[1] McMahan et al. *Communication-Efficient Learning of Deep Networks from Decentralized Data* (AISTATS 2017). https://proceedings.mlr.press/v54/mcmahan17a.html  
+[2] Kairouz et al. *Advances and Open Problems in Federated Learning* (arXiv:1912.04977). https://arxiv.org/abs/1912.04977  
+[3] Bonawitz et al. *Practical Secure Aggregation for Privacy-Preserving Machine Learning* (ePrint 2017/281). https://eprint.iacr.org/2017/281  
+[4] Rieke et al. *The future of digital health with federated learning* (npj Digital Medicine, 2020). https://doi.org/10.1038/s41746-020-00323-1  
+[5] Hard et al. *Federated Learning for Mobile Keyboard Prediction* (arXiv:1811.03604). https://arxiv.org/abs/1811.03604  
+[6] Zheng et al. *Federated Meta-Learning for Fraudulent Credit Card Detection* (IJCAI 2020). https://doi.org/10.24963/ijcai.2020/642  
+[7] GDPR (EUR-Lex). *Regulation (EU) 2016/679* (GDPR) — Article 44 “General principle for transfers”. https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng  
+[8] California DOJ. *California Consumer Privacy Act (CCPA)* overview. https://oag.ca.gov/privacy/ccpa  
+[9] U.S. HHS. *The HIPAA Privacy Rule* overview. https://www.hhs.gov/hipaa/for-professionals/privacy/index.html  
+[10] U.S. FTC. *How to Comply with the Privacy of Consumer Financial Information Rule (GLBA)*. https://www.ftc.gov/tips-advice/business-center/guidance/how-comply-privacy-consumer-financial-information-rule-gramm  
+[11] Pew Research Center. *Americans and Privacy: Concerned, Confused and Feeling Lack of Control Over Their Personal Information* (2019). https://www.pewresearch.org/internet/2019/11/15/americans-and-privacy-concerned-confused-and-feeling-lack-of-control-over-their-personal-information/  
+[12] IETF Internet-Draft. *Definition of End-to-end Encryption* (draft-knodel-e2ee-definition-11). https://datatracker.ietf.org/doc/html/draft-knodel-e2ee-definition-11  
+[13] Flower Datasets. *DirichletPartitioner* (alpha-controlled label-skew partitioning; docs reference Yurochkin et al.). https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.DirichletPartitioner.html  
+[14] Karimireddy et al. *SCAFFOLD: Stochastic Controlled Averaging for Federated Learning* (ICML 2020). https://proceedings.mlr.press/v119/karimireddy20a.html  
+[15] Li et al. *Federated Optimization in Heterogeneous Networks (FedProx)* (MLSys 2020). https://proceedings.mlsys.org/paper_files/paper/2020/hash/1f5fe83998a09396ebe6477d9475ba0c-Abstract.html  
+[16] Zhao et al. *Federated Learning with Non-IID Data* (CoRR abs/1806.00582, 2018). https://arxiv.org/abs/1806.00582  
+[17] Li et al. *Federated Learning on Non-IID Data Silos: An Experimental Study* (ICDE 2022). https://doi.org/10.1109/ICDE53745.2022.00077  
+[18] Yurochkin et al. *Bayesian Nonparametric Federated Learning of Neural Networks* (arXiv:1905.12022). https://arxiv.org/abs/1905.12022  
+[19] Reddi et al. *Adaptive Federated Optimization* (arXiv:2003.00295). https://arxiv.org/abs/2003.00295  
+[20] Duchi et al. *Adaptive Subgradient Methods for Online Learning and Stochastic Optimization* (JMLR 2011). https://jmlr.org/papers/v12/duchi11a.html  
+[21] Kingma and Ba. *Adam: A Method for Stochastic Optimization* (arXiv:1412.6980). https://arxiv.org/abs/1412.6980  
+
+
