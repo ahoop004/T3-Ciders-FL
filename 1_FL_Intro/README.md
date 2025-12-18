@@ -201,6 +201,29 @@ One notable challenge is the communication overhead involved. Federated learning
 
 Security is another important concern in federated learning. Although the method is designed to protect raw data, it can still be vulnerable to privacy attacks, such as model inversion or membership inference, where an attacker tries to extract sensitive information from shared model updates. Therefore, extra privacy-preserving techniques, like differential privacy or secure aggregation, are often needed. Moreover, ensuring trust and verification among all participants can be challenging. It’s important to detect any malicious users who might provide false or harmful model updates, and to have methods in place for verifying that each contribution to the global model is legitimate.
 
+## Security and Trust in Federated Learning
+
+Federated learning reduces the need to centralize raw data, but it does **not** automatically guarantee privacy or trustworthiness. In practice, “trust” has three parts:
+
+1. **Privacy of client data:** can someone infer sensitive information about a client’s training data from model outputs or updates?
+2. **Integrity of training:** can a malicious client manipulate updates to degrade the global model or introduce backdoors?
+3. **System trust:** can we trust the FL process (participants, software, and infrastructure) to behave as intended?
+
+### Key privacy risks (examples)
+- **Membership inference:** an attacker may determine whether a specific record was part of the training data (even with only query access to a model). [13]
+- **Model inversion / reconstruction:** an attacker may reconstruct sensitive features of training data from model outputs or gradients under certain conditions. [14]
+
+### Key integrity risks (examples)
+- **Model poisoning / backdoors:** malicious clients can send crafted updates to steer the global model toward attacker goals. [15]
+
+### Common mitigations (high-level)
+- **Secure aggregation:** the server learns only an aggregate (e.g., sum/average) of client updates, not individual updates. This helps protect confidentiality of client contributions but does not, by itself, prevent poisoned updates. [3]
+- **Differential privacy (DP):** add calibrated noise so that the influence of any single user’s data on the model is bounded. [16]
+- **Robust aggregation / monitoring:** detect outliers, clip updates, or use robust aggregation rules to reduce the impact of malicious or extreme client updates. [2]
+
+**In this workshop:** Modules 1–2 focus on the basic FL loop and non-IID effects. Security and attack/defense concepts are introduced here at a conceptual level and revisited later with hands-on experiments.
+
+
 ## Next Steps
 
 This introduction provides the foundation for understanding Federated Learning. In subsequent modules, we will explore:
@@ -227,3 +250,7 @@ Federated Learning represents not just a technical innovation, but a fundamental
 [11] Pew Research Center. *Americans and Privacy: Concerned, Confused and Feeling Lack of Control Over Their Personal Information* (2019). https://www.pewresearch.org/internet/2019/11/15/americans-and-privacy-concerned-confused-and-feeling-lack-of-control-over-their-personal-information/  
 [12] IETF Internet-Draft. *Definition of End-to-end Encryption* (draft-knodel-e2ee-definition). https://datatracker.ietf.org/doc/html/draft-knodel-e2ee-definition-11  
 
+[13] Shokri et al. *Membership Inference Attacks Against Machine Learning Models* (IEEE S&P 2017). https://doi.org/10.1109/SP.2017.41  
+[14] Fredrikson et al. *Model Inversion Attacks that Exploit Confidence Information and Basic Countermeasures* (CCS 2015). https://doi.org/10.1145/2810103.2813677  
+[15] Bagdasaryan et al. *How To Backdoor Federated Learning* (AISTATS 2020). https://proceedings.mlr.press/v108/bagdasaryan20a.html  
+[16] Dwork and Roth. *The Algorithmic Foundations of Differential Privacy* (2014). https://www.microsoft.com/en-us/research/publication/algorithmic-foundations-differential-privacy/  

@@ -44,6 +44,21 @@ jupyter notebook 3_Algorithms/Algorithms.ipynb
 jupyter notebook 4_Adversarial_FL/Adv_FL.ipynb
 
 ```
+---
+## Prerequisites
+
+This workshop assumes the following background:
+
+### Required
+- **Python basics:** variables, functions, loops, imports, reading error messages.
+- **Jupyter usage:** running cells top-to-bottom, restarting kernel, re-running cells.
+- **Intro ML concepts:** train vs. test split, overfitting, loss, accuracy, epochs, batches.
+- **PyTorch basics:** tensors, `Dataset`/`DataLoader`, `nn.Module`, optimizer step (high-level).
+- **Git basics:** clone, commit, push (or use GitHub Desktop / VS Code Source Control).
+
+### Helpful (not required)
+- **Probability/statistics:** distributions, sampling, mean/variance.
+- **Security mindset:** what “attacker model” means and why privacy/integrity threats matter in FL.
 
 
 ---
