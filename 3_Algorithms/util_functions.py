@@ -8,6 +8,11 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision import datasets, transforms
 
+# Import shared utilities from common module
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from common.utils import set_seed, evaluate_fn
+
 def set_logger(log_path):
 
     logger = logging.getLogger()
@@ -29,17 +34,7 @@ def save_plt(x,y,xlabel,ylabel,filename):
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
 
-def set_seed(seed):
-    np.random.seed(seed)
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        if hasattr(torch.backends, "cudnn"):
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
+# set_seed is now imported from common.utils
 
 def create_data(data_path, dataset_name):
 
@@ -174,26 +169,4 @@ def numpy_to_tensor(data, device, dtype="float"):
     elif dtype=="long":
         return torch.tensor(data, dtype=torch.long).to(device)
 
-def evaluate_fn(dataloader,model,loss_fn,device):
-
-    model.eval()
-    running_loss = 0
-    total = 0
-    correct = 0
-
-    num_batches = 0
-    with torch.no_grad():
-        for images, labels in dataloader:
-            output = model(images.to(device))
-            loss = loss_fn(output,labels.to(device))
-            running_loss += loss.item()
-            total += labels.size(0)
-            correct += (output.argmax(dim=1).cpu() == labels.cpu()).sum().item()
-            num_batches += 1
-
-    if num_batches == 0:
-        return 0.0, 0.0
-
-    avg_loss = running_loss/num_batches
-    acc = 100*(correct/total)
-    return avg_loss,acc
+# evaluate_fn is now imported from common.utils

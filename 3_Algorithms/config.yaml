@@ -1,6 +1,6 @@
 data_config:
-  dataset_path: "./Data/Imagenette"
-  dataset_name: "Imagenette"
+  dataset_path: "./data"
+  dataset_name: "MNIST"
   non_iid_per: 0
 
 global_config:
@@ -9,9 +9,8 @@ global_config:
 
 model_config:
   module: "model"
-  name: "MobileNetV3Transfer"
+  name: "AlexNet"
   kwargs:
-    pretrained: true
     num_classes: 10
 
 algorithms:
