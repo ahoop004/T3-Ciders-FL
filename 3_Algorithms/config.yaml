@@ -33,11 +33,11 @@ algorithms:
       num_rounds: 5
       num_epochs: 5
       batch_size: 64
-      global_stepsize: 0.1
+      global_stepsize: 1.0  # SCAFFOLD uses larger server LR
       local_stepsize: 0.01
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config:
-      c_init: 0.05
+      c_init: 0.0  # Initialize control variates to zero
 
   FedAdam:
     fed_config:
@@ -46,7 +46,7 @@ algorithms:
       num_rounds: 5
       num_epochs: 5
       batch_size: 64
-      global_stepsize: 0.1
+      global_stepsize: 0.01  # Adaptive methods need smaller server LR
       local_stepsize: 0.01
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config:
@@ -61,7 +61,7 @@ algorithms:
       num_rounds: 5
       num_epochs: 5
       batch_size: 64
-      global_stepsize: 0.1
+      global_stepsize: 0.01  # Adaptive methods need smaller server LR
       local_stepsize: 0.01
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config:
@@ -74,7 +74,7 @@ algorithms:
       num_rounds: 5
       num_epochs: 5
       batch_size: 64
-      global_stepsize: 0.1
+      global_stepsize: 0.01  # Adaptive methods need smaller server LR
       local_stepsize: 0.01
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config:
