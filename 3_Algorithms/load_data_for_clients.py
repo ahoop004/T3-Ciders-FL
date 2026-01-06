@@ -157,8 +157,11 @@ def dist_data_per_client(data_path,dataset_name,num_clients, batch_size, non_iid
         dataset = load_data(x, y)
         client_loaders.append(DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=0))
 
-    # Finally create the server test set
-    test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True, num_workers=0)
+    # Finally create the server test set using the same load_data wrapper for consistency
+    x_test = numpy_to_tensor(np.asarray(test_data.data), device, "float")
+    y_test = numpy_to_tensor(np.asarray(test_data.targets), device, "long")
+    test_dataset = load_data(x_test, y_test)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
     os.makedirs("cache", exist_ok=True)
     with open(cache_file, "wb") as f:
