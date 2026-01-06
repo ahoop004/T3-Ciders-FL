@@ -141,12 +141,23 @@ class load_data(Dataset):
         self.length = x.shape[0]
         self.x = x.permute(0,3,1,2)
         self.y = y
-        # self.image_transform = transforms.Normalize((127.5, 127.5, 127.5),(127.5, 127.5, 127.5))
-        # self.image_transform = transforms.Normalize((0.1307,), (0.3081,))
-        self.image_transform = transforms.Normalize(
-            mean=(0.485, 0.456, 0.406),
-            std =(0.229, 0.224, 0.225)
-        )
+        # Dynamically determine normalization based on number of channels
+        num_channels = self.x.shape[1]
+        if num_channels == 1:
+            # Grayscale (e.g., MNIST)
+            self.image_transform = transforms.Normalize((0.1307,), (0.3081,))
+        elif num_channels == 3:
+            # RGB (e.g., CIFAR10, Imagenette)
+            self.image_transform = transforms.Normalize(
+                mean=(0.485, 0.456, 0.406),
+                std =(0.229, 0.224, 0.225)
+            )
+        else:
+            # No normalization for other channel counts
+            self.image_transform = transforms.Normalize(
+                mean=tuple([0.5] * num_channels),
+                std=tuple([0.5] * num_channels)
+            )
         
         
     def __getitem__(self, index):
