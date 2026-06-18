@@ -47,6 +47,7 @@ class MaliciousClient(Client):
         self.start_round = int(self.attack_config.get("start_round", 0))
         self._current_poison_rate = 0.0
         self._attack_active = False
+        self.attack_stats = self._empty_attack_stats()
 
         self.attack_type = self.attack_params.get("type", "pgd").lower()
         attack_callable = self.attack_params.get("callable")
@@ -92,12 +93,28 @@ class MaliciousClient(Client):
 
     def on_round_start(self, round_idx: int, total_rounds: int) -> None:
         super().on_round_start(round_idx, total_rounds)
-        if round_idx < self.start_round:
+        round_number = round_idx + 1
+        self.attack_stats = self._empty_attack_stats(round_number)
+        if round_number < self.start_round:
             self._attack_active = False
             self._current_poison_rate = 0.0
+            self.attack_stats["active"] = False
             return
         self._attack_active = True
-        self._current_poison_rate = self._poison_rate_for_round(round_idx, total_rounds)
+        self._current_poison_rate = self._poison_rate_for_round(round_number, total_rounds)
+        self.attack_stats["active"] = True
+        self.attack_stats["poison_rate"] = self._current_poison_rate
+
+    def _empty_attack_stats(self, round_number: int | None = None) -> Dict[str, Any]:
+        return {
+            "round": round_number,
+            "active": False,
+            "poison_rate": 0.0,
+            "processed_examples": 0,
+            "candidate_examples": 0,
+            "poisoned_examples": 0,
+            "attack_successes": 0,
+        }
 
     def _surrogate_loader(self) -> Optional[DataLoader]:
         if self._surrogate_dataset is None:
@@ -147,7 +164,7 @@ class MaliciousClient(Client):
         if best_state is not None:
             self.surrogate.load_state_dict(best_state)
 
-    def _poison_rate_for_round(self, round_idx: int, total_rounds: int) -> float:
+    def _poison_rate_for_round(self, round_number: int, total_rounds: int) -> float:
         if not self.poison_schedule:
             return self.poison_rate
 
@@ -158,14 +175,21 @@ class MaliciousClient(Client):
         start = float(self.poison_schedule.get("start", self.poison_rate))
         end = float(self.poison_schedule.get("end", start))
         effective_start = max(self.start_round, 0)
-        horizon = max((total_rounds - 1) - effective_start, 1)
-        progress = max(round_idx - effective_start, 0) / horizon
+        horizon = max(total_rounds - effective_start, 1)
+        progress = max(round_number - effective_start, 0) / horizon
         progress = min(max(progress, 0.0), 1.0)
 
         if schedule_type == "linear":
             return start + (end - start) * progress
 
         return self.poison_rate
+
+    def get_attack_stats(self) -> Dict[str, Any]:
+        stats = dict(self.attack_stats)
+        poisoned = int(stats.get("poisoned_examples", 0))
+        successes = int(stats.get("attack_successes", 0))
+        stats["attack_success_rate"] = 100.0 * successes / poisoned if poisoned else 0.0
+        return stats
 
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         attack_key = self.attack_type
@@ -210,15 +234,22 @@ class MaliciousClient(Client):
             for inputs, labels in self.data:
                 inputs = inputs.float().to(self.device)
                 labels = labels.long().to(self.device)
+                self.attack_stats["processed_examples"] += int(labels.size(0))
 
                 poison_rate = self._current_poison_rate if self._attack_active else 0.0
                 if poison_rate > 0.0:
+                    self.attack_stats["candidate_examples"] += int(labels.size(0))
                     mask = torch.rand(labels.size(0), device=self.device) < poison_rate
                     if mask.any():
                         clean_inputs = inputs[mask]
                         poison_labels = torch.full_like(labels[mask], int(self.target_label))
                         self.surrogate.eval()
                         adv_examples = self.perform_attack(clean_inputs, poison_labels)
+                        with torch.no_grad():
+                            adv_preds = self.surrogate(adv_examples).argmax(dim=1)
+                            attack_successes = (adv_preds == poison_labels).sum().item()
+                        self.attack_stats["poisoned_examples"] += int(mask.sum().item())
+                        self.attack_stats["attack_successes"] += int(attack_successes)
                         inputs = inputs.clone()
                         labels = labels.clone()
                         inputs[mask] = adv_examples

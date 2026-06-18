@@ -6,7 +6,6 @@ import logging
 import os
 import random
 from importlib import import_module
-from types import SimpleNamespace
 from typing import Any, Callable, Tuple, Type
 
 import matplotlib.pyplot as plt
@@ -65,13 +64,7 @@ def create_data(data_path: str, dataset_name: str):
     if key == "IMAGENETTE":
         from torchvision.datasets import Imagenette
 
-        preprocess = transforms.Compose(
-            [
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-            ]
-        )
-        eval_transform = transforms.Compose(
+        image_transform = transforms.Compose(
             [
                 transforms.Resize(256),
                 transforms.CenterCrop(224),
@@ -85,25 +78,82 @@ def create_data(data_path: str, dataset_name: str):
             split="train",
             size="full",
             download=True,
-            transform=preprocess,
+            transform=image_transform,
         )
         test_data = Imagenette(
             root=data_path,
             split="val",
             size="full",
             download=True,
-            transform=eval_transform,
+            transform=image_transform,
         )
 
-        imgs, labels = [], []
-        for img, label in raw_train:
-            arr = np.asarray(img.convert("RGB"), dtype=np.uint8)
-            imgs.append(arr)
-            labels.append(label)
-        train_data = SimpleNamespace(data=np.stack(imgs), targets=labels)
+        targets = _extract_targets(raw_train)
+        if targets is None:
+            targets = [int(label) for _, label in raw_train]
+        raw_train.targets = targets
 
-        return train_data, test_data
+        return raw_train, test_data
 
+    if hasattr(datasets, key):
+        if key == "CIFAR10":
+            transform = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        (0.4914, 0.4822, 0.4465),
+                        (0.2470, 0.2435, 0.2616),
+                    ),
+                ]
+            )
+        elif key == "MNIST":
+            transform = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.1307,), (0.3081,)),
+                ]
+            )
+        else:
+            transform = transforms.Compose(
+                [
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+                ]
+            )
+
+        dataset_class = datasets.__dict__[key]
+        if "train" in dataset_class.__init__.__code__.co_varnames:
+            train_data = dataset_class(
+                root=data_path,
+                train=True,
+                download=True,
+                transform=transform,
+            )
+            test_data = dataset_class(
+                root=data_path,
+                train=False,
+                download=True,
+                transform=transform,
+            )
+        else:
+            train_data = dataset_class(
+                root=data_path,
+                split="train",
+                download=True,
+                transform=transform,
+            )
+            test_data = dataset_class(
+                root=data_path,
+                split="test",
+                download=True,
+                transform=transform,
+            )
+    else:
+        raise AttributeError(
+            f'Dataset "{original_name}" is not supported or cannot be found in TorchVision Datasets.'
+        )
 
 
     if hasattr(train_data, "data") and getattr(train_data.data, "ndim", 0) == 3:
@@ -118,6 +168,21 @@ def create_data(data_path: str, dataset_name: str):
             test_data.data = test_data.data.unsqueeze(3)
 
     return train_data, test_data
+
+
+def _extract_targets(dataset) -> list[int] | None:
+    """Return class labels from common torchvision dataset layouts."""
+    for attr in ("targets", "labels", "_labels"):
+        values = getattr(dataset, attr, None)
+        if values is not None:
+            return [int(v) for v in values]
+
+    for attr in ("samples", "imgs", "_samples"):
+        values = getattr(dataset, attr, None)
+        if values is not None:
+            return [int(sample[1]) for sample in values]
+
+    return None
 
 
 class LoadData(Dataset):

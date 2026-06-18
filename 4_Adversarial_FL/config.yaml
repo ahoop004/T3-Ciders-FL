@@ -33,7 +33,7 @@ algorithms:
     fed_config:
       fraction_clients: 0.2
       num_clients: 50
-      num_rounds: 2
+      num_rounds: 8
       num_epochs: 2
       batch_size: 128
       global_stepsize: 1.0
@@ -100,7 +100,7 @@ algorithms:
 attack:
   seed: 42
   malicious_fraction: 0.1
-  start_round: 5
+  start_round: 2
   attack:
     type: "pgd"
     poison_rate: 0.2

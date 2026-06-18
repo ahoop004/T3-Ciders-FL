@@ -103,9 +103,13 @@ class BaseServer:
         self.fed_config = fed_config
         self.optim_config = optim_config or {}
 
-        self.device = torch.device(
-            global_config.get("device", "cuda" if torch.cuda.is_available() else "cpu")
+        requested_device = global_config.get(
+            "device", "cuda" if torch.cuda.is_available() else "cpu"
         )
+        if isinstance(requested_device, str) and requested_device.startswith("cuda"):
+            if not torch.cuda.is_available():
+                requested_device = "cpu"
+        self.device = torch.device(requested_device)
         self.num_clients = fed_config["num_clients"]
         self.client_fraction = fed_config["fraction_clients"]
         self.num_rounds = fed_config["num_rounds"]

@@ -2,7 +2,7 @@
 # Adversarial FL on Imagenette — README
 
 ## Overview
-Goal: evaluate black‑box adversarial robustness for an **Imagenette** classifier with **MobileNetV3** as the target and **MobileNetV2** as a surrogate. Attacks: **random noise**, **FGSM**, **PGD**. Optionally consider federated learning (FL) poisoning to contrast *data poisoning* vs *model poisoning*.
+Goal: evaluate black-box adversarial robustness for an **Imagenette** classifier with **MobileNetV3** as the target and **MobileNetV2** as a surrogate. Attacks: **random noise**, **FGSM**, **PGD**. The notebook first builds a clean FedAvg baseline, then trains a surrogate, measures surrogate-to-target transfer, and finally runs poisoned-client FL experiments that Module 5 will defend against.
 
 ### Threat models
 - **Data poisoning.** The attacker injects or alters training samples to shift decision boundaries or implant behaviors. Certified analyses study defenses that sanitize outliers before ERM. In FL, **model poisoning** goes further: a malicious client crafts its update so aggregation embeds targeted misbehavior or a backdoor while keeping global accuracy high.
@@ -65,11 +65,12 @@ Report for each attack and \(\epsilon\):
 - **Clean accuracy** and **robust accuracy** on the target.
 - **Attack success rate (ASR)** on the target.
 - **Transfer success** from surrogate → target (for FGSM/PGD crafted on the surrogate).
-- If FL is used: **global accuracy**, **targeted/backdoor ASR**, and per‑round dynamics.
+- For FL poisoning: **global accuracy**, **targeted/backdoor ASR**, and per-round dynamics.
 
 ### Practical tips
-- Normalize inputs exactly as the model was trained. Apply perturbations in normalized space if the loss expects it, then de‑normalize and clip to \([0,1]\).
-- Use consistent \(\epsilon\) in pixel space. On 8‑bit images, common values: 2/255, 4/255, 8/255.
+- Normalize inputs exactly as the model was trained.
+- Module 4 attacks use pixel-space budgets even though the models receive ImageNet-normalized tensors: tensors are de-normalized for clipping/projection, then normalized again for MobileNet evaluation.
+- Use consistent \(\epsilon\) in pixel space. On 8-bit images, common values: 2/255, 4/255, 8/255.
 - For Imagenette, MobileNetV2/V3 reach high 80s–90s% clean accuracy with standard training; expect transfer ASR to rise with \(\epsilon\) and with PGD steps.
 - Keep a **random noise** curve to separate adversarial from generic corruption sensitivity (cf. ImageNet‑C).
 
@@ -87,9 +88,25 @@ Report for each attack and \(\epsilon\):
 
 
 ## Minimal run notes
-1. Open `Adv_FL.ipynb` and run setup cells to install deps and load Imagenette. 
-2. Train **MobileNetV3** (target) and **MobileNetV2** (surrogate) or load checkpoints. 
-3. Generate FGSM/PGD adversarials on the surrogate and evaluate on the target. 
-4. Log curves: clean acc vs. robust acc, ASR vs. \(\epsilon\), and transfer success. 
-5. If simulating FL, log round‑wise global accuracy and backdoor ASR.
+1. Install the repository requirements, then open `Adv_FL.ipynb` from this directory.
+2. Run the config and validation cells. The default FedAvg run is 8 rounds and the attack starts at round 2.
+3. Run the clean FedAvg baseline. This saves `artifacts/module4_federated_baseline.json`, `artifacts/module4_config_used.json`, `artifacts/baseline_loss.png`, and `artifacts/baseline_accuracy.png`.
+4. Train the MobileNetV2 surrogate and run random-noise, FGSM, and PGD sanity checks. This saves `artifacts/module4_surrogate.json`, `artifacts/module4_surrogate_attacks.json`, and `artifacts/asr_by_attack.png`.
+5. Run surrogate-to-target transfer evaluation. This saves `artifacts/module4_transfer_results.json`.
+6. Run clean-vs-attacked FedAvg and the malicious-fraction sweep. This saves `artifacts/module4_federated_attacks.json`, `artifacts/attack_accuracy.png`, `artifacts/module4_fraction_sweep.json`, and `artifacts/malicious_fraction_sweep.png`.
 
+## Expected artifacts
+
+| Artifact | Purpose |
+| --- | --- |
+| `module4_federated_baseline.json` | Clean FedAvg reference metrics |
+| `module4_config_used.json` | Config snapshot with resolved device |
+| `module4_surrogate.json` | Surrogate training and test metrics |
+| `module4_surrogate_attacks.json` | Random, FGSM, and PGD surrogate attack metrics |
+| `module4_transfer_results.json` | MobileNetV2-to-MobileNetV3 transfer metrics |
+| `module4_federated_attacks.json` | Clean vs attacked FedAvg metrics |
+| `module4_fraction_sweep.json` | Malicious-fraction sweep table |
+| `baseline_accuracy.png`, `baseline_loss.png` | Clean training curves |
+| `asr_by_attack.png` | Surrogate attack comparison |
+| `attack_accuracy.png` | Clean vs attacked FedAvg curve with attack-start marker |
+| `malicious_fraction_sweep.png` | Accuracy and ASR versus malicious-client fraction |

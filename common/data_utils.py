@@ -104,11 +104,7 @@ def make_client_loaders(
         client_idxs = _iid_partition(len(train_ds), num_clients, seed=seed)
     else:
         alpha = max(0.01, 1.0 - 0.99 * non_iid_per)
-        targets = (
-            train_ds.targets
-            if hasattr(train_ds, "targets")
-            else train_ds.labels
-        )
+        targets = _extract_targets(train_ds)
         client_idxs = dirichlet_partition(targets, num_clients, alpha=alpha, seed=seed)
 
     client_loaders = [
@@ -125,6 +121,22 @@ def make_client_loaders(
         test_ds, batch_size=512, shuffle=False, drop_last=False, num_workers=0
     )
     return client_loaders, test_loader
+
+
+def _extract_targets(dataset):
+    for attr in ("targets", "labels", "_labels"):
+        values = getattr(dataset, attr, None)
+        if values is not None:
+            return values
+
+    for attr in ("samples", "imgs", "_samples"):
+        values = getattr(dataset, attr, None)
+        if values is not None:
+            return [sample[1] for sample in values]
+
+    raise AttributeError(
+        "Training dataset must expose labels through targets, labels, or samples."
+    )
 
 
 __all__ = ["dirichlet_partition", "make_client_loaders"]

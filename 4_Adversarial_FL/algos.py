@@ -81,6 +81,7 @@ class Server(BaseServer):
         self.dataset_name = data_config.get("dataset_name", "MNIST")
         self.non_iid_per = data_config.get("non_iid_per", 0.0)
         self.attack_config = attack_config or {}
+        self.malicious_client_ids: list[int] = []
         self.lr = fed_config.get("global_stepsize", 1.0)
         self.lr_l = fed_config.get("local_stepsize", 0.01)
         self.current_round = 0
@@ -116,6 +117,7 @@ class Server(BaseServer):
             if num_mal > 0
             else set()
         )
+        self.malicious_client_ids = sorted(int(idx) for idx in mal_ids)
         clients = []
         for idx, dataset in enumerate(local_datasets):
             if idx in mal_ids:
@@ -170,7 +172,14 @@ class Server(BaseServer):
     # Training loop override — tracks current_round for MaliciousClient
     # ------------------------------------------------------------------
     def train(self) -> None:
-        self.results = {"loss": [], "accuracy": []}
+        self.results = {
+            "loss": [],
+            "accuracy": [],
+            "attack_success_rate": [],
+            "poisoned_examples": [],
+            "candidate_examples": [],
+            "sampled_malicious_clients": [],
+        }
         for round_idx in range(self.num_rounds):
             self.current_round = round_idx
             logging.info(f"\nCommunication Round: {round_idx + 1}")
@@ -185,10 +194,42 @@ class Server(BaseServer):
             loss, acc = evaluate_fn(
                 self.test_loader, self.global_model, self.criterion, self.device
             )
+            attack_stats = self.collect_round_attack_stats(client_ids)
             self.results["loss"].append(loss)
             self.results["accuracy"].append(acc)
+            self.results["attack_success_rate"].append(attack_stats["attack_success_rate"])
+            self.results["poisoned_examples"].append(attack_stats["poisoned_examples"])
+            self.results["candidate_examples"].append(attack_stats["candidate_examples"])
+            self.results["sampled_malicious_clients"].append(
+                attack_stats["sampled_malicious_clients"]
+            )
             logging.info(f"\tLoss: {loss:.4f}   Accuracy: {acc:.2f}%")
             print(f"\tServer Loss: {loss:.4f}   Accuracy: {acc:.2f}%")
+
+    def collect_round_attack_stats(self, client_ids: Sequence[int]) -> dict:
+        """Aggregate poisoning counters from sampled malicious clients."""
+        totals = {
+            "candidate_examples": 0,
+            "poisoned_examples": 0,
+            "attack_successes": 0,
+            "sampled_malicious_clients": 0,
+        }
+        for idx in client_ids:
+            client = self.clients[idx]
+            get_stats = getattr(client, "get_attack_stats", None)
+            if get_stats is None:
+                continue
+            stats = get_stats()
+            totals["sampled_malicious_clients"] += 1
+            totals["candidate_examples"] += int(stats.get("candidate_examples", 0))
+            totals["poisoned_examples"] += int(stats.get("poisoned_examples", 0))
+            totals["attack_successes"] += int(stats.get("attack_successes", 0))
+
+        poisoned = totals["poisoned_examples"]
+        totals["attack_success_rate"] = (
+            100.0 * totals["attack_successes"] / poisoned if poisoned else 0.0
+        )
+        return totals
 
     # ------------------------------------------------------------------
     # FedAvg aggregation (reads client.y parameters)
