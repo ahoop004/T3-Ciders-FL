@@ -58,6 +58,8 @@ Module 1 quietly assumed that clients had roughly similar data (IID or near-IID)
 
 ## IID vs non-IID: definitions and types of heterogeneity
 
+![IID vs Non-IID dataset concept](iid_1.png)
+
 ### IID (Independent and Identically Distributed)
 
 All clients sample from the same joint distribution P(x, y). Each client dataset is an unbiased random subset of the global dataset. FedAvg works well in this regime because local gradients point in compatible directions.
@@ -73,6 +75,10 @@ Client-specific distributions differ from each other and from the global distrib
 5. **Temporal drift / nonstationarity:** a client's distribution changes over time, not just across clients.
 
 **In this module:** we focus on **label distribution skew** because it is the most studied form and the easiest to visualize and control.
+
+![IID uniform vs Non-IID label skew heatmaps](figures/section2/s2_01_iid_vs_noniid.png)
+
+![Types of data heterogeneity in federated learning](figures/section2/s2_02_heterogeneity_examples.png)
 
 ---
 
@@ -95,6 +101,8 @@ As a rule of thumb:
 | 1.0 | Moderate skew — noticeable but not extreme |
 | 10.0 | Near-IID — distributions are close to uniform |
 
+![Measuring non-IID heterogeneity with client label heatmap](figures/section2/s2_04_measure_heatmap.png)
+
 ### Procedure (label-skew)
 
 Let K = number of classes, N = number of clients, α > 0 = Dirichlet concentration.
@@ -114,6 +122,8 @@ Note that the proportions sum to 1 across clients.
 
 This produces realistic non-IID label distributions while letting you control severity with a single number.
 
+![Per-partition label distribution example](tutorial-visualize-label-distribution_9_0.png)
+
 ### Notebook knob: `non_iid_per`
 
 The notebook exposes a convenience parameter `non_iid_per ∈ [0, 1]` that maps to α internally:
@@ -128,6 +138,8 @@ alpha = max(0.01, 1.0 - 0.99 * non_iid_per)
 ---
 
 ## Expected effects of non-IID on federated training
+
+![Client drift: aligned IID updates vs conflicting non-IID updates](figures/section2/s2_03_effects_conflict_vectors.png)
 
 When heterogeneity increases, students should expect to observe: [14][15][16]
 

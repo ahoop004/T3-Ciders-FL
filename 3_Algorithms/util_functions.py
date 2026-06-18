@@ -129,11 +129,6 @@ def create_data(data_path, dataset_name):
         )
 
 
-    if hasattr(train_data, "data") and train_data.data.ndim == 3:
-        train_data.data = train_data.data.unsqueeze(3)
-    if hasattr(test_data, "data") and test_data.data.ndim == 3:
-        test_data.data = test_data.data.unsqueeze(3)
-
     return train_data, test_data
 
 class load_data(Dataset):

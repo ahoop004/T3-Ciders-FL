@@ -1,17 +1,9 @@
-"""FL base classes for Module 5 — defensive federated learning.
+"""FL base class re-export for Module 5.
 
-Import BaseClient and BaseServer from here, then extend BaseServer and
-override ``aggregate()`` to implement robust aggregation rules such as
-coordinate-wise median, trimmed mean, or Krum.
-
-Example::
-
-    from federated_core import BaseClient, BaseServer
-
-    class MedianServer(BaseServer):
-        def aggregate(self, local_states):
-            # replace simple average with coordinate-wise median
-            ...
+The shared ``BaseClient`` and ``BaseServer`` still live in ``common``.  Module
+5's attack-aware robust servers are implemented in ``defensive_servers.py`` so
+they can reuse Module 4's malicious-client pipeline and override aggregation
+without changing the attack recipe.
 """
 
 import sys
