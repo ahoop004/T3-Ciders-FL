@@ -17,7 +17,9 @@ def final_value(values: Any, default: float = 0.0) -> float:
     if isinstance(values, (int, float)):
         return float(values)
     if isinstance(values, list) and values:
-        return float(values[-1])
+        for value in reversed(values):
+            if value is not None:
+                return float(value)
     return default
 
 
@@ -26,9 +28,24 @@ def final_accuracy(results: Mapping[str, Any]) -> float:
     return final_value(results.get("accuracy"))
 
 
+def final_global_target_label_asr(results: Mapping[str, Any]) -> float:
+    """Return final global-model target-label ASR from server results."""
+    return final_value(results.get("global_target_label_asr"))
+
+
+def final_surrogate_poison_success_rate(results: Mapping[str, Any]) -> float:
+    """Return final malicious-client surrogate poison success rate."""
+    return final_value(results.get("surrogate_poison_success_rate"))
+
+
 def final_asr(results: Mapping[str, Any]) -> float:
-    """Return final attack success rate from a server ``results`` dict."""
-    return final_value(results.get("attack_success_rate"))
+    """Return final global target-label ASR.
+
+    Kept for older notebook code. This intentionally reads
+    ``global_target_label_asr`` and does not treat surrogate poisoning success
+    as a global-model ASR.
+    """
+    return final_global_target_label_asr(results)
 
 
 def accuracy_drop(clean_accuracy: float, attacked_accuracy: float) -> float:
@@ -42,7 +59,7 @@ def defense_recovery(defended_accuracy: float, attacked_fedavg_accuracy: float) 
 
 
 def asr_reduction(attacked_fedavg_asr: float, defended_asr: float) -> float:
-    """Compute ASR reduction relative to attacked FedAvg."""
+    """Compute global target-label ASR reduction relative to attacked FedAvg."""
     return float(attacked_fedavg_asr) - float(defended_asr)
 
 
@@ -54,21 +71,33 @@ def summarize_run(
 ) -> dict[str, Any]:
     """Build one comparison row from a server ``results`` dict."""
     acc = final_accuracy(results)
-    asr = final_asr(results)
+    global_target_asr = final_global_target_label_asr(results)
+    surrogate_poison_success = final_surrogate_poison_success_rate(results)
 
     clean_acc = _reference_accuracy(clean_reference)
     attacked_acc = _reference_accuracy(attacked_reference)
-    attacked_asr = _reference_asr(attacked_reference)
+    attacked_global_target_asr = _reference_global_target_label_asr(
+        attacked_reference
+    )
+    attacked_surrogate_poison_success = _reference_surrogate_poison_success_rate(
+        attacked_reference
+    )
 
     row = {
         "run": run_name,
         "final_accuracy": acc,
-        "asr": asr,
+        "final_global_target_label_asr": global_target_asr,
+        "final_surrogate_poison_success_rate": surrogate_poison_success,
         "accuracy_drop": None if clean_acc is None else accuracy_drop(clean_acc, acc),
         "defense_recovery": None
         if attacked_acc is None
         else defense_recovery(acc, attacked_acc),
-        "asr_reduction": None if attacked_asr is None else asr_reduction(attacked_asr, asr),
+        "global_target_label_asr_reduction": None
+        if attacked_global_target_asr is None
+        else asr_reduction(attacked_global_target_asr, global_target_asr),
+        "surrogate_poison_success_rate_reduction": None
+        if attacked_surrogate_poison_success is None
+        else attacked_surrogate_poison_success - surrogate_poison_success,
         "runtime_sec": float(sum(results.get("round_runtime_sec", []) or [])),
         "rounds": int(len(results.get("accuracy", []) or [])),
     }
@@ -183,11 +212,40 @@ def _reference_accuracy(reference: Mapping[str, Any] | float | None) -> float | 
 
 
 def _reference_asr(reference: Mapping[str, Any] | float | None) -> float | None:
+    return _reference_global_target_label_asr(reference)
+
+
+def _reference_global_target_label_asr(
+    reference: Mapping[str, Any] | float | None
+) -> float | None:
     if reference is None:
         return None
     if isinstance(reference, (int, float)):
         return float(reference)
-    return final_asr(reference)
+    if not _has_metric(reference, "global_target_label_asr"):
+        return None
+    return final_global_target_label_asr(reference)
+
+
+def _reference_surrogate_poison_success_rate(
+    reference: Mapping[str, Any] | float | None
+) -> float | None:
+    if reference is None:
+        return None
+    if isinstance(reference, (int, float)):
+        return float(reference)
+    if not _has_metric(reference, "surrogate_poison_success_rate"):
+        return None
+    return final_surrogate_poison_success_rate(reference)
+
+
+def _has_metric(results: Mapping[str, Any], key: str) -> bool:
+    values = results.get(key)
+    if values is None:
+        return False
+    if isinstance(values, list):
+        return any(value is not None for value in values)
+    return True
 
 
 def _jsonable(value: Any) -> Any:
@@ -217,6 +275,8 @@ __all__ = [
     "evaluate_target_label_rate",
     "final_accuracy",
     "final_asr",
+    "final_global_target_label_asr",
+    "final_surrogate_poison_success_rate",
     "final_value",
     "latest_defense_diagnostics",
     "save_csv",

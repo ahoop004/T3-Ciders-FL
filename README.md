@@ -1,6 +1,6 @@
 # Federated Learning Workshop (T3-Ciders-FL)
 
-A modular federated learning (FL) workshop that moves from the FL control loop, to non-IID client data, to federated optimizers, to adversarial poisoning.
+A modular federated learning (FL) workshop that moves from the FL control loop, to non-IID client data, to federated optimizers, to adversarial poisoning, and finally to defensive aggregation.
 
 **Where to run:** we run the notebooks on the **ODU HPC (Wahab) via Open OnDemand**. (Detailed HPC steps are in the accompanying slides.)
 
@@ -42,6 +42,9 @@ jupyter notebook 3_Algorithms/Algorithms.ipynb
 
 # Module 4
 jupyter notebook 4_Adversarial_FL/Adv_FL.ipynb
+
+# Module 5
+jupyter notebook 5_Defensive_FL/Defensive_FL.ipynb
 
 ```
 ---
@@ -97,9 +100,13 @@ Model black-box adversaries using surrogate models and standard attacks.
 
 Notebook: `4_Adversarial_FL/Adv_FL.ipynb`
 
-### Module 5 — Defensive FL (WIP)
-Defensive baselines and robust aggregation.
-Directory: `5_Defensive_FL/`
+### Module 5 — Defensive Federated Learning
+Defend against malicious-client FedAvg poisoning with robust aggregation.
+- FedAvg control, clipping, coordinate-wise median, trimmed mean, Krum, Multi-Krum, and geometric median / RFA
+- Compare clean accuracy, attacked accuracy, defense recovery, surrogate poison success, and `global_target_label_asr`
+- Stress defenses under malicious-fraction and non-IID sweeps
+
+Notebook: `5_Defensive_FL/Defensive_FL.ipynb`
 
 ---
 
@@ -111,7 +118,7 @@ Directory: `5_Defensive_FL/`
 ├── 2_IID_Concepts/ # Module 2 notebooks for data splits
 ├── 3_Algorithms/ # Module 3 optimisation comparisons
 ├── 4_Adversarial_FL/ # Module 4 surrogate / adversarial lab
-├── 5_Defensive_FL/ # Module 5 defensive baselines (WIP)
+├── 5_Defensive_FL/ # Module 5 defensive aggregation lab
 ├── fed_go_through/ # Utilities / scratch space
 ├── T3-FL.drawio # Diagram summarising module flow
 └── README.md
@@ -134,7 +141,7 @@ Recommended:
 ## Configuration Notes
 
 - Modules 1–2: most hyperparameters are defined directly in the notebook cells.
-- Modules 3–4: use `config.yaml` in the module directory for experiment settings (so you can tweak runs without editing core code).
+- Modules 3–5: use `config.yaml` in the module directory for experiment settings (so you can tweak runs without editing core code).
 
 If a module directory includes its own README, follow that module’s README first.
 

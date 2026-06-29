@@ -25,19 +25,51 @@ def plot_accuracy_curves(
     )
 
 
+def plot_global_target_label_asr_curves(
+    run_results: Mapping[str, Mapping[str, Any]],
+    path: str | Path,
+    attack_start_round: int | None = None,
+    title: str = "Global target-label ASR by round",
+) -> Path:
+    """Save a line plot of global target-label ASR curves."""
+    return plot_metric_curves(
+        run_results,
+        metric="global_target_label_asr",
+        path=path,
+        attack_start_round=attack_start_round,
+        ylabel="Global target-label ASR (%)",
+        title=title,
+    )
+
+
+def plot_surrogate_poison_success_curves(
+    run_results: Mapping[str, Mapping[str, Any]],
+    path: str | Path,
+    attack_start_round: int | None = None,
+    title: str = "Surrogate poison success rate by round",
+) -> Path:
+    """Save a line plot of malicious-client surrogate poisoning success."""
+    return plot_metric_curves(
+        run_results,
+        metric="surrogate_poison_success_rate",
+        path=path,
+        attack_start_round=attack_start_round,
+        ylabel="Surrogate poison success rate (%)",
+        title=title,
+    )
+
+
 def plot_asr_curves(
     run_results: Mapping[str, Mapping[str, Any]],
     path: str | Path,
     attack_start_round: int | None = None,
-    title: str = "Attack success rate by round",
+    title: str = "Global target-label ASR by round",
 ) -> Path:
-    """Save a line plot of ASR curves for named runs."""
-    return plot_metric_curves(
+    """Compatibility wrapper for global target-label ASR curves."""
+    return plot_global_target_label_asr_curves(
         run_results,
-        metric="attack_success_rate",
-        path=path,
+        path,
         attack_start_round=attack_start_round,
-        ylabel="ASR (%)",
         title=title,
     )
 
@@ -73,7 +105,9 @@ def plot_metric_curves(
     if title:
         ax.set_title(title)
     ax.grid(True, alpha=0.25)
-    ax.legend()
+    handles, _ = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend()
     return _save(fig, path)
 
 
@@ -177,7 +211,9 @@ __all__ = [
     "plot_accuracy_curves",
     "plot_asr_curves",
     "plot_defense_comparison",
+    "plot_global_target_label_asr_curves",
     "plot_metric_curves",
     "plot_sweep_metric",
+    "plot_surrogate_poison_success_curves",
     "plot_update_norm_histogram",
 ]

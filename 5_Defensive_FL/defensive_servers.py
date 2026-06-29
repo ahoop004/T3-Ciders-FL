@@ -16,6 +16,7 @@ from copy import deepcopy
 from typing import Any, Sequence, Type
 
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(MODULE_DIR)
@@ -27,7 +28,13 @@ for path in (MODULE4_DIR, REPO_ROOT):
 
 from algos import Server as AdversarialServer  # noqa: E402
 from defenses import aggregate_client_updates, summarize_client_updates  # noqa: E402
-from util_functions import evaluate_fn, set_logger  # noqa: E402
+from util_functions import (  # noqa: E402
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    evaluate_fn,
+    set_logger,
+    target_label_prediction_rate,
+)
 
 
 class DefensiveServer(AdversarialServer):
@@ -61,12 +68,87 @@ class DefensiveServer(AdversarialServer):
         self.server_stepsize = float(self.defense_config.get("server_stepsize", 1.0))
         self.last_defense_diagnostics: dict[str, Any] = {}
 
+    def setup(self, **_kwargs) -> None:
+        """Partition data and create clients, with a tiny synthetic smoke path."""
+        if _is_synthetic_smoke_dataset(self.dataset_name):
+            local_datasets, test_dataset = self._synthetic_smoke_loaders()
+            self.test_loader = test_dataset
+            self.clients = self.create_clients(local_datasets)
+            logging.info("Synthetic smoke clients successfully initialised")
+            return
+
+        super().setup(**_kwargs)
+
+    def _synthetic_smoke_loaders(self) -> tuple[list[DataLoader], DataLoader]:
+        """Create deterministic ImageNet-normalized tensors for smoke runs."""
+        train_samples = int(
+            self.data_config.get(
+                "num_train_samples",
+                max(self.num_clients * self.batch_size, self.num_clients),
+            )
+        )
+        test_samples = int(self.data_config.get("num_test_samples", self.batch_size))
+        image_size = int(self.data_config.get("image_size", 64))
+        num_classes = int(self.model_kwargs.get("num_classes", 10))
+
+        if train_samples < self.num_clients:
+            raise ValueError(
+                "SyntheticSmoke requires data_config.num_train_samples >= "
+                "fed_config.num_clients so every client receives data."
+            )
+        if test_samples <= 0:
+            raise ValueError("SyntheticSmoke requires data_config.num_test_samples > 0.")
+        if image_size <= 0:
+            raise ValueError("SyntheticSmoke requires data_config.image_size > 0.")
+
+        seed = int(self.global_config.get("seed", 42))
+        generator = torch.Generator().manual_seed(seed)
+        train_images, train_labels = _make_synthetic_image_batch(
+            train_samples,
+            image_size=image_size,
+            num_classes=num_classes,
+            generator=generator,
+        )
+        test_images, test_labels = _make_synthetic_image_batch(
+            test_samples,
+            image_size=image_size,
+            num_classes=num_classes,
+            generator=generator,
+        )
+
+        client_indices = torch.tensor_split(torch.arange(train_samples), self.num_clients)
+        local_loaders = [
+            DataLoader(
+                TensorDataset(train_images[idxs], train_labels[idxs]),
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=0,
+                generator=torch.Generator().manual_seed(seed + client_id + 1),
+            )
+            for client_id, idxs in enumerate(client_indices)
+        ]
+        test_loader = DataLoader(
+            TensorDataset(test_images, test_labels),
+            batch_size=int(self.data_config.get("test_batch_size", self.batch_size)),
+            shuffle=False,
+            drop_last=False,
+            num_workers=0,
+        )
+        print(
+            "Using SyntheticSmoke data: "
+            f"{train_samples} train examples, {test_samples} test examples, "
+            f"{self.num_clients} clients, image_size={image_size}."
+        )
+        return local_loaders, test_loader
+
     def train(self) -> None:
         """Run FL rounds with attack and defense diagnostics."""
         self.results = {
             "loss": [],
             "accuracy": [],
-            "attack_success_rate": [],
+            "surrogate_poison_success_rate": [],
+            "global_target_label_asr": [],
+            "global_target_label": self._configured_target_label(),
             "poisoned_examples": [],
             "candidate_examples": [],
             "sampled_malicious_clients": [],
@@ -97,13 +179,16 @@ class DefensiveServer(AdversarialServer):
                 self.device,
             )
             attack_stats = self.collect_round_attack_stats(client_ids)
+            global_target_label_asr = self._global_target_label_asr()
             elapsed = time.perf_counter() - round_start
 
             self.results["loss"].append(loss)
             self.results["accuracy"].append(acc)
-            self.results["attack_success_rate"].append(
-                attack_stats["attack_success_rate"]
+            self.results["surrogate_poison_success_rate"].append(
+                attack_stats["surrogate_poison_success_rate"]
             )
+            if global_target_label_asr is not None:
+                self.results["global_target_label_asr"].append(global_target_label_asr)
             self.results["poisoned_examples"].append(attack_stats["poisoned_examples"])
             self.results["candidate_examples"].append(attack_stats["candidate_examples"])
             self.results["sampled_malicious_clients"].append(
@@ -116,6 +201,26 @@ class DefensiveServer(AdversarialServer):
 
             logging.info("\tLoss: %.4f   Accuracy: %.2f%%", loss, acc)
             print(f"\tServer Loss: {loss:.4f}   Accuracy: {acc:.2f}%")
+
+    def _configured_target_label(self) -> int | None:
+        attack_recipe = self.attack_config.get("attack", {})
+        target_label = attack_recipe.get("target_label")
+        return int(target_label) if target_label is not None else None
+
+    def _global_target_label_asr(self) -> float | None:
+        """Measure target-label behavior on the global model when configured."""
+        target_label = self._configured_target_label()
+        if target_label is None:
+            return None
+        return float(
+            target_label_prediction_rate(
+                self.test_loader,
+                self.global_model,
+                target_label,
+                self.device,
+                exclude_true_target_label=True,
+            )
+        )
 
     def aggregate(self, client_ids: Sequence[int]) -> None:
         """Aggregate client model deltas with the configured defense."""
@@ -225,6 +330,37 @@ SERVER_REGISTRY: dict[str, Type[DefensiveServer]] = {
 }
 
 
+def _is_synthetic_smoke_dataset(dataset_name: str | None) -> bool:
+    return str(dataset_name or "").lower() in {
+        "syntheticsmoke",
+        "synthetic_smoke",
+        "smoke",
+    }
+
+
+def _make_synthetic_image_batch(
+    num_samples: int,
+    *,
+    image_size: int,
+    num_classes: int,
+    generator: torch.Generator,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    images = torch.rand(
+        num_samples,
+        3,
+        image_size,
+        image_size,
+        generator=generator,
+    )
+    mean = torch.tensor(IMAGENET_MEAN, dtype=images.dtype).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD, dtype=images.dtype).view(1, 3, 1, 1)
+    images = (images - mean) / std
+
+    labels = torch.arange(num_samples, dtype=torch.long) % int(num_classes)
+    order = torch.randperm(num_samples, generator=generator)
+    return images[order], labels[order]
+
+
 def get_defensive_server_class(defense_config: dict[str, Any] | None = None) -> Type[DefensiveServer]:
     """Return the server subclass matching ``defense_config['name']``."""
     name = str((defense_config or {}).get("name", "fedavg")).lower()
@@ -294,9 +430,6 @@ def validate_module5_config(
     if "non_iid_per" not in data_config:
         issues.append("data_config.non_iid_per must be set.")
 
-    if not defense_config.get("name"):
-        issues.append("defense.name must be set.")
-
     num_rounds = int(fed_config.get("num_rounds", 0))
     start_round = int(attack_config.get("start_round", 0))
     if require_attack and num_rounds <= start_round:
@@ -307,16 +440,113 @@ def validate_module5_config(
         issues.append("attack.malicious_fraction must be > 0 for attacked runs.")
 
     if require_attack and attack_recipe.get("target_label") is None:
-        issues.append("attack.attack.target_label must be set for targeted ASR.")
+        issues.append(
+            "attack.attack.target_label must be set for global target-label ASR."
+        )
 
     poison_rate = float(attack_recipe.get("poison_rate", 0.0))
     if require_attack and poison_rate <= 0:
         issues.append("attack.attack.poison_rate must be > 0 for attacked runs.")
 
-    _validate_defense_feasibility(defense_config, fed_config, issues)
+    issues.extend(
+        validate_defense_config(
+            defense_config,
+            fed_config,
+            context="defense",
+        )
+    )
+
+    experiment_defenses = config.get("experiments", {}).get("defenses", []) or []
+    for idx, experiment_defense in enumerate(experiment_defenses):
+        name = str(experiment_defense.get("name", "fedavg"))
+        issues.extend(
+            validate_defense_config(
+                experiment_defense,
+                fed_config,
+                context=f"experiments.defenses[{idx}] ({name})",
+            )
+        )
 
     if raise_on_error and issues:
         raise ValueError("Module 5 config validation failed:\n- " + "\n- ".join(issues))
+    return issues
+
+
+def sampled_client_count(fed_config: dict[str, Any]) -> int:
+    """Return the exact per-round client sample count used by BaseServer."""
+    num_clients = int(fed_config.get("num_clients", 0))
+    fraction = float(fed_config.get("fraction_clients", 0.0))
+    if num_clients <= 0:
+        return 0
+    return max(int(num_clients * fraction), 1)
+
+
+def validate_defense_config(
+    defense_config: dict[str, Any],
+    fed_config: dict[str, Any],
+    context: str = "defense",
+) -> list[str]:
+    """Validate one defense setting against the configured client sampling."""
+    issues: list[str] = []
+    defense_name = str(defense_config.get("name", "fedavg")).lower()
+    num_clients = int(fed_config.get("num_clients", 0))
+    fraction = float(fed_config.get("fraction_clients", 0.0))
+    sampled_clients = sampled_client_count(fed_config)
+
+    if not defense_config.get("name"):
+        issues.append(f"{context}: defense name must be set.")
+    elif defense_name not in SERVER_REGISTRY:
+        issues.append(
+            f"{context}: unknown defense '{defense_name}'. "
+            f"Available defenses: {sorted(SERVER_REGISTRY)}."
+        )
+
+    if num_clients <= 0:
+        issues.append(f"{context}: fed_config.num_clients must be > 0.")
+    if fraction <= 0:
+        issues.append(f"{context}: fed_config.fraction_clients must be > 0.")
+    if num_clients > 0 and fraction > 1:
+        issues.append(
+            f"{context}: fed_config.fraction_clients must be <= 1.0 "
+            "because clients are sampled without replacement."
+        )
+
+    if defense_name in {"krum", "multi_krum", "multikrum"}:
+        byzantine_f = int(defense_config.get("byzantine_f", 1))
+        if byzantine_f < 0:
+            issues.append(f"{context}: byzantine_f must be non-negative.")
+        elif sampled_clients <= 2 * byzantine_f + 2:
+            issues.append(
+                f"{context}: Krum requires sampled_clients > 2 * byzantine_f + 2. "
+                f"Current num_clients={num_clients}, fraction_clients={fraction}, "
+                f"sampled_clients={sampled_clients}, byzantine_f={byzantine_f}."
+            )
+
+        if defense_name in {"multi_krum", "multikrum"}:
+            selected_count = int(defense_config.get("selected_count", 1))
+            max_selected = sampled_clients - byzantine_f - 2
+            if selected_count < 1:
+                issues.append(f"{context}: selected_count must be at least 1.")
+            elif selected_count > max_selected:
+                issues.append(
+                    f"{context}: Multi-Krum selected_count must be <= "
+                    f"sampled_clients - byzantine_f - 2. Current "
+                    f"selected_count={selected_count}, max_selected={max_selected}."
+                )
+
+    if defense_name in {"trimmed_mean", "trimmed-mean"}:
+        trim_fraction = float(defense_config.get("trim_fraction", 0.1))
+        if trim_fraction < 0 or trim_fraction >= 0.5:
+            issues.append(f"{context}: trim_fraction must be in [0, 0.5).")
+        else:
+            trim_count = int(sampled_clients * trim_fraction)
+            if sampled_clients and 2 * trim_count >= sampled_clients:
+                issues.append(
+                    f"{context}: trimmed_mean removes all updates. Current "
+                    f"sampled_clients={sampled_clients}, trim_fraction={trim_fraction}, "
+                    f"trim_count={trim_count}."
+                )
+
     return issues
 
 
@@ -347,27 +577,7 @@ def _validate_defense_feasibility(
     fed_config: dict[str, Any],
     issues: list[str],
 ) -> None:
-    defense_name = str(defense_config.get("name", "fedavg")).lower()
-    num_clients = int(fed_config.get("num_clients", 0))
-    fraction = float(fed_config.get("fraction_clients", 0.0))
-    sampled_clients = max(int(num_clients * fraction), 1) if num_clients else 0
-
-    if defense_name in {"krum", "multi_krum", "multikrum"}:
-        byzantine_f = int(defense_config.get("byzantine_f", 1))
-        if sampled_clients <= 2 * byzantine_f + 2:
-            issues.append(
-                "Krum requires sampled_clients > 2 * defense.byzantine_f + 2. "
-                f"Current sampled_clients={sampled_clients}, byzantine_f={byzantine_f}."
-            )
-
-    if defense_name in {"trimmed_mean", "trimmed-mean"}:
-        trim_fraction = float(defense_config.get("trim_fraction", 0.1))
-        trim_count = int(sampled_clients * trim_fraction)
-        if sampled_clients and 2 * trim_count >= sampled_clients:
-            issues.append(
-                "trimmed_mean removes all updates. Lower defense.trim_fraction "
-                "or sample more clients."
-            )
+    issues.extend(validate_defense_config(defense_config, fed_config))
 
 
 __all__ = [
@@ -383,5 +593,7 @@ __all__ = [
     "get_defensive_server_class",
     "make_attack_config",
     "run_defensive_fl",
+    "sampled_client_count",
+    "validate_defense_config",
     "validate_module5_config",
 ]

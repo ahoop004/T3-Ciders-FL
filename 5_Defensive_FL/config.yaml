@@ -76,4 +76,63 @@ experiments:
   non_iid_sweep: [0.0, 0.5, 0.8]
   clipping_clip_norm_sweep: [1.0, 2.0, 5.0, 10.0]
   trimmed_mean_fraction_sweep: [0.05, 0.1, 0.2]
+  # f=5 is intentionally infeasible with the default 10 sampled clients;
+  # the notebook records it as status="skipped_infeasible".
   krum_byzantine_f_sweep: [1, 2, 5]
+
+run_modes:
+  smoke:
+    artifact_subdir: "smoke"
+    global_config:
+      device: "cpu"
+    data_config:
+      dataset_path: "./Data/SyntheticSmoke"
+      dataset_name: "SyntheticSmoke"
+      non_iid_per: 0.0
+      num_train_samples: 16
+      num_test_samples: 8
+      image_size: 64
+      test_batch_size: 8
+    model_config:
+      kwargs:
+        pretrained: false
+        num_classes: 10
+    fed_config:
+      fraction_clients: 1.0
+      num_clients: 4
+      num_rounds: 2
+      num_epochs: 1
+      batch_size: 4
+      global_stepsize: 1.0
+      local_stepsize: 0.001
+    attack:
+      malicious_fraction: 0.25
+      start_round: 1
+      attack:
+        type: "pgd"
+        poison_rate: 1.0
+        target_label: 0
+        epsilon: 0.03137255
+        step_size: 0.00784314
+        iters: 1
+        poison_rate_schedule: null
+      surrogate:
+        pretrained: false
+        finetune_epochs: 0
+        batch_size: 4
+        freeze_backbone: true
+        augment: false
+        early_stop_patience: 0
+    experiments:
+      defenses:
+        - name: "fedavg"
+        - name: "clipping"
+          clip_norm: 1.0
+        - name: "median"
+      malicious_fraction_sweep: []
+      non_iid_sweep: []
+      clipping_clip_norm_sweep: []
+      trimmed_mean_fraction_sweep: []
+      krum_byzantine_f_sweep: []
+  workshop: {}
+  full: {}
