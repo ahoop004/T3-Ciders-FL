@@ -246,6 +246,43 @@ def evaluate_fn(dataloader: DataLoader, model: torch.nn.Module, loss_fn, device:
     return avg_loss, acc
 
 
+def target_label_prediction_rate(
+    dataloader: DataLoader,
+    model: torch.nn.Module,
+    target_label: int,
+    device: torch.device,
+    *,
+    exclude_true_target_label: bool = True,
+) -> float:
+    """Return how often a model predicts ``target_label`` on eligible examples."""
+    target_label = int(target_label)
+    was_training = model.training
+    model.eval()
+
+    total = 0
+    predicted_target = 0
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images = images.to(device)
+            labels = labels.to(device).long()
+            if exclude_true_target_label:
+                mask = labels != target_label
+                if not mask.any():
+                    continue
+                images = images[mask]
+                labels = labels[mask]
+
+            outputs = model(images)
+            preds = outputs.argmax(dim=1)
+            total += int(labels.numel())
+            predicted_target += int((preds == target_label).sum().item())
+
+    if was_training:
+        model.train()
+
+    return 100.0 * predicted_target / total if total else 0.0
+
+
 def resolve_callable(path: str) -> Callable[..., Any]:
     module_name, _, attr = path.rpartition(".")
     if not module_name:
@@ -292,5 +329,6 @@ __all__ = [
     "save_plt",
     "set_logger",
     "set_seed",
+    "target_label_prediction_rate",
     "tensor_to_numpy",
 ]

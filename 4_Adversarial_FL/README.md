@@ -1,112 +1,266 @@
-
-# Adversarial FL on Imagenette — README
+# Module 4 — Adversarial Surrogates & FedAvg Poisoning
 
 ## Overview
-Goal: evaluate black-box adversarial robustness for an **Imagenette** classifier with **MobileNetV3** as the target and **MobileNetV2** as a surrogate. Attacks: **random noise**, **FGSM**, **PGD**. The notebook first builds a clean FedAvg baseline, then trains a surrogate, measures surrogate-to-target transfer, and finally runs poisoned-client FL experiments that Module 5 will defend against.
+
+**Teaching:** 25-45 min  
+**Exercises:** 30-60 min  
+**Notebook:** `4_Adversarial_FL/Adv_FL.ipynb`  
+**Where to run:** ODU HPC (Wahab via Open OnDemand)
+
+This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students build a clean FedAvg MobileNetV3 target model, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, and then run malicious-client FedAvg poisoning experiments.
+
+The main lesson is that clean accuracy is not enough. A model can perform well on unmodified Imagenette examples while losing robust accuracy under adversarial perturbations or showing target-label behavior after poisoned FedAvg training. Module 5 uses these failures to motivate defensive aggregation.
+
+---
+
+## Learning objectives
+
+By the end of this module, students should be able to:
+
+1. Explain what adversarial examples are and why small perturbations can change predictions.
+2. Compare random noise, FGSM, and PGD under the same pixel-space perturbation budget.
+3. Describe a black-box transfer attack using a MobileNetV2 surrogate against a MobileNetV3 target.
+4. Distinguish clean accuracy, robust accuracy, transfer success, target-label success, surrogate poison success, and `global_target_label_asr`.
+5. Explain how malicious clients poison part of local training in the FedAvg experiment.
+6. State clearly that Module 4 poisoning is wired for FedAvg only.
+7. Explain why FedAvg's plain averaging motivates Module 5 defenses.
+
+---
+
+## Guiding questions
+
+Use these questions to frame the module:
+
+1. Why does random noise provide a useful baseline before FGSM or PGD?
+2. What information does FGSM use that random noise does not?
+3. Why is PGD usually a stronger robustness test than FGSM at the same epsilon?
+4. What makes the MobileNetV2-to-MobileNetV3 setup a black-box transfer attack?
+5. When should a metric be called robust accuracy instead of attack success?
+6. What does surrogate-to-target transfer success measure?
+7. Why is surrogate poison success not the same thing as final global-model target-label behavior?
+8. Why is malicious-client poisoning in this module limited to FedAvg?
+9. Why does a plain average make FedAvg vulnerable to malicious clients?
+10. What should Module 5 defenses try to recover or reduce?
+
+---
+
+## Core concepts
 
 ### Threat models
-- **Data poisoning.** The attacker injects or alters training samples to shift decision boundaries or implant behaviors. Certified analyses study defenses that sanitize outliers before ERM. In FL, **model poisoning** goes further: a malicious client crafts its update so aggregation embeds targeted misbehavior or a backdoor while keeping global accuracy high.
-- **Black‑box attacks.** The attacker sees only outputs of the target model. Two strategies:
-  1) **Transfer‑based:** train a local **surrogate** and craft adversarial examples that transfer to the target.
-  2) **Query‑based:** estimate gradients from queries under limits on queries or output information.
 
-### Surrogate models
-A **surrogate** approximates the target decision function. Adversarial examples crafted on the surrogate often **transfer** to the target. In this notebook, train **MobileNetV2** on Imagenette (or on target‑labeled data) and attack **MobileNetV3**. Report transfer success as the fraction of adversarial inputs misclassified by the target.
+This module uses two adversarial levels:
 
-## Models: MobileNetV2 vs MobileNetV3
+* **Input-level adversarial examples:** the attacker perturbs evaluation images within a small pixel-space budget. Random noise is a corruption baseline; FGSM and PGD use surrogate gradients.
+* **Client-level data poisoning:** malicious FL clients perturb and relabel selected local examples before local training. The poisoned local update is then averaged by FedAvg with honest client updates.
 
-### MobileNetV2 (target surrogate choice rationale)
-- **Core block:** *Inverted residual* with a **linear bottleneck**: expand with 1×1 conv → depthwise 3×3 → project with 1×1 conv; residual skip on matching shapes. Nonlinearity uses **ReLU6** except in the narrow bottleneck where it is removed to preserve information.
-- **Why it’s efficient:** depthwise separable convs reduce MACs; inverted residuals let most computation happen in the expanded space while keeping I/O channels small.
-- **Typical stack:** initial 3×3 conv, then ~17–19 bottleneck blocks with varying expansion \(t\), channels \(k\), and stride \(s\); global average pool and classifier.
-- **Why V2 as surrogate:** stable, widely available checkpoints, fast backprop, and gradients that transfer well to other mobile backbones.
+Model replacement and direct update manipulation are important adversarial FL topics, but they are not implemented in this Module 4 notebook.
 
-### MobileNetV3 (target model rationale)
-- **Search + design:** combines **hardware‑aware NAS** and **NetAdapt** to choose per‑layer channels and kernel sizes.
-- **Block improvements:** keeps the V2 inverted residual pattern but adds **Squeeze‑and‑Excitation (SE)** in many blocks and replaces ReLU with **hard‑swish**/**hard‑sigmoid** activations to improve accuracy‑latency trade‑offs on CPUs.
-- **Variants:** **MobileNetV3‑Large** and **V3‑Small**; both tailored to mobile inference.
-- **Why V3 as target:** higher ImageNet accuracy at lower latency than V2; better real‑device throughput for the same budget.
+### Random noise, FGSM, and PGD
 
-### Practical differences for this project
-- **Transfer crafting:** craft FGSM/PGD on **V2** and evaluate transfer to **V3**; transferability is helped by shared inverted‑residual structure but moderated by V3’s SE and activation changes.
-- **Preprocessing:** both expect ImageNet‑style normalization and 224×224 inputs in standard training; keep normalization consistent across surrogate and target.
-- **Latency/accuracy:** at similar budgets, V3‑Large typically improves ImageNet top‑1 by ~3% over V2 while reducing CPU latency by ~20% (per original paper). This motivates using V3 as the stronger target and V2 as the efficient attacker.
+Random noise adds input perturbations without using model gradients. It helps answer whether the model is simply sensitive to small corruptions.
 
-## Attacks used here
+FGSM takes one gradient-sign step that increases loss, or decreases target-label loss for targeted attacks. It is fast and useful as a first adversarial baseline.
 
-### 1) Random noise (baseline)
-Add i.i.d. noise with the same norm budget as adversarial attacks. Purpose: sanity check and corruption robustness baseline. Expect much lower fooling rates than FGSM/PGD.
+PGD repeats smaller gradient-sign steps and projects the perturbed image back into the allowed L-infinity epsilon ball. It is usually stronger than FGSM because it searches the allowed perturbation region more thoroughly.
 
-- **ℓ∞ noise:**  \(x_{noise} = \text{clip}(x + \eta, 0, 1)\), with \(\eta \sim \text{Uniform}(-\epsilon,\epsilon)\) or Gaussian clipped to \([-\epsilon,\epsilon]\).
-- **Report:** top‑1 accuracy under noise vs \(\epsilon\).
+All Module 4 attack budgets are interpreted in pixel space. The helper functions de-normalize ImageNet-normalized tensors, clip or project in pixel space, and normalize again for MobileNet evaluation.
 
-### 2) FGSM — Fast Gradient Sign Method
-One‑step first‑order attack under an ℓ∞ budget:
-\[
-x_{adv} = \text{clip}\big(x + \epsilon\,\mathrm{sign}(\nabla_x \mathcal{L}(\theta,x,y)), 0, 1\big).
-\]
-- **Pros:** single backprop, fast, sets the reference trade‑off vs \(\epsilon\).
-- **Notes:** compute gradients on the **surrogate** when attacking a black‑box target; then evaluate transfer on the target.
+### MobileNetV2 surrogate vs MobileNetV3 target
 
-### 3) PGD — Projected Gradient Descent
-Multi‑step iterative variant with projection to the \(\ell_\infty\) ball:
-\[
-x^{t+1}=\Pi_{B_\epsilon(x)}\!\big(x^{t}+\alpha\,\mathrm{sign}(\nabla_x \mathcal{L}(\theta,x^{t},y))\big),\quad x^0= x+\text{Uniform}(-\epsilon,\epsilon).
-\]
-- **Pros:** much stronger than FGSM at the same \(\epsilon\); with random starts it approximates a universal first‑order adversary.
-- **Typical hyperparameters:** steps 5–40, step size \(\alpha\in[\epsilon/4,\epsilon/2]\).
+The attacker uses MobileNetV2 as a differentiable surrogate and evaluates transfer on the MobileNetV3 target trained by clean FedAvg. This is a black-box transfer setting: the attacker crafts adversarial examples from surrogate gradients rather than target gradients.
 
-## Federated learning angle (optional)
-- **Data poisoning (client‑level):** attacker perturbs or labels local examples to bias the global model.
-- **Model poisoning:** attacker directly manipulates the client update (e.g., **model replacement**) so the aggregated model embeds a targeted backdoor while preserving overall accuracy. Track backdoor attack success rate (ASR) and clean accuracy across rounds.
+MobileNetV2 and MobileNetV3 are different architectures, but both are mobile image classifiers with related design patterns. That makes them a useful pair for showing that adversarial examples can transfer even when the attacker does not directly optimize against the target.
 
-## Evaluation protocol
-Report for each attack and \(\epsilon\):
-- **Clean accuracy** and **robust accuracy** on the target.
-- **Attack success rate (ASR)** on the target.
-- **Transfer success** from surrogate → target (for FGSM/PGD crafted on the surrogate).
-- For FL poisoning: **global accuracy**, **targeted/backdoor ASR**, and per-round dynamics.
+### Metric vocabulary
 
-### Practical tips
-- Normalize inputs exactly as the model was trained.
-- Module 4 attacks use pixel-space budgets even though the models receive ImageNet-normalized tensors: tensors are de-normalized for clipping/projection, then normalized again for MobileNet evaluation.
-- Use consistent \(\epsilon\) in pixel space. On 8-bit images, common values: 2/255, 4/255, 8/255.
-- For Imagenette, MobileNetV2/V3 reach high 80s–90s% clean accuracy with standard training; expect transfer ASR to rise with \(\epsilon\) and with PGD steps.
-- Keep a **random noise** curve to separate adversarial from generic corruption sensitivity (cf. ImageNet‑C).
+Use explicit metric names throughout the module:
 
-## References
-- **FGSM:** Goodfellow, Shlens, Szegedy. *Explaining and Harnessing Adversarial Examples* (2014). arXiv:1412.6572.  
-- **PGD / adversarial training:** Madry et al. *Towards Deep Learning Models Resistant to Adversarial Attacks* (2017).  
-- **Black‑box transfer via surrogate:** Papernot et al. *Practical Black‑Box Attacks against Machine Learning* (AsiaCCS 2017).  
-- **Query‑efficient black box:** Ilyas et al. *Black‑Box Adversarial Attacks with Limited Queries and Information* (ICML 2018).  
-- **Data poisoning, certified perspective:** Steinhardt, Koh, Liang. *Certified Defenses for Data Poisoning Attacks* (NeurIPS 2017).  
-- **FL model poisoning / backdoor:** Bagdasaryan et al. *How to Backdoor Federated Learning* (AISTATS 2020). Bhagoji et al. *Analyzing Federated Learning through an Adversarial Lens* (ICML 2019).  
-- **Corruption baseline:** Hendrycks, Dietterich. *Benchmarking Neural Network Robustness to Common Corruptions and Perturbations* (ICLR 2019).
-- **MobileNetV2:** Sandler, Howard, Zhu, Zhmoginov, Chen. *MobileNetV2: Inverted Residuals and Linear Bottlenecks* (CVPR 2018). arXiv:1801.04381. 
-- **MobileNetV3:** Howard, Sandler, Chu, Chen, Chen, Tan, Wang, Zhu, Pang, Vasudevan, Le, Adam. *Searching for MobileNetV3* (ICCV 2019). arXiv:1905.02244. 
+| Metric | Meaning |
+| --- | --- |
+| Clean accuracy | Accuracy on unmodified examples |
+| Robust accuracy | Accuracy on perturbed examples using the original labels |
+| Surrogate target-label success rate | Fraction of surrogate-crafted examples MobileNetV2 predicts as the configured target label |
+| Surrogate-to-target transfer success rate | Fraction of MobileNetV2-crafted examples that MobileNetV3 misclassifies |
+| Target-model target-label success rate | Fraction of MobileNetV2-crafted examples that MobileNetV3 predicts as the configured target label |
+| Surrogate poison success rate | During FL poisoning, fraction of poisoned local examples the malicious client's MobileNetV2 surrogate predicts as the target label |
+| `global_target_label_asr` | After FedAvg poisoning, percentage of held-out non-target test examples whose final MobileNetV3 global-model prediction is the configured target label |
+| Global FL attacked accuracy | Final MobileNetV3 global-model accuracy after FedAvg training with malicious clients |
 
+Do not collapse these into a generic "ASR." In this module, ASR is only used when the attacked model and success condition are explicit, especially for `global_target_label_asr`.
 
+### FedAvg poisoning scope
 
-## Minimal run notes
-1. Install the repository requirements, then open `Adv_FL.ipynb` from this directory.
-2. Run the config and validation cells. The default FedAvg run is 8 rounds and the attack starts at round 2.
-3. Run the clean FedAvg baseline. This saves `artifacts/module4_federated_baseline.json`, `artifacts/module4_config_used.json`, `artifacts/baseline_loss.png`, and `artifacts/baseline_accuracy.png`.
-4. Train the MobileNetV2 surrogate and run random-noise, FGSM, and PGD sanity checks. This saves `artifacts/module4_surrogate.json`, `artifacts/module4_surrogate_attacks.json`, and `artifacts/asr_by_attack.png`.
-5. Run surrogate-to-target transfer evaluation. This saves `artifacts/module4_transfer_results.json`.
-6. Run clean-vs-attacked FedAvg and the malicious-fraction sweep. This saves `artifacts/module4_federated_attacks.json`, `artifacts/attack_accuracy.png`, `artifacts/module4_fraction_sweep.json`, and `artifacts/malicious_fraction_sweep.png`.
+`config.yaml` lists FedAvg, FedAdam, FedAdagrad, FedYogi, and Scaffold/SCAFFOLD so clean baselines can share one configuration file. The malicious-client poisoning path is currently wired only for the FedAvg server path.
+
+FedOpt and SCAFFOLD attack experiments would need additional malicious-client support because those paths use optimizer-specific update fields and, for SCAFFOLD, control-variate state. Teach the Module 4 FL poisoning section as a FedAvg poisoning experiment.
+
+---
+
+## Relation to the notebook
+
+In `Adv_FL.ipynb`, students will:
+
+1. Validate `config.yaml` and save `artifacts/module4_config_used.json`.
+2. Run a clean FedAvg MobileNetV3 baseline and save the target checkpoint.
+3. Train and sanity-check a MobileNetV2 surrogate.
+4. Compare random noise, FGSM, and PGD on the surrogate.
+5. Evaluate MobileNetV2-crafted examples on the MobileNetV3 target.
+6. Run clean vs PGD-poisoned FedAvg under the default malicious-client fraction.
+7. Sweep malicious-client fraction and inspect final attacked accuracy, surrogate poison success, and `global_target_label_asr`.
+8. Use the artifact guide to connect each saved file to an interpretation question.
+
+The notebook is intended to be run top-to-bottom. The clean FedAvg baseline should be credible before students interpret attack results.
+
+---
+
+## Configuration notes
+
+Main settings are in `4_Adversarial_FL/config.yaml`.
+
+| Key | What it controls |
+| --- | --- |
+| `data_config.dataset_path` | Imagenette download/cache location |
+| `data_config.non_iid_per` | Client label-skew severity using the same convention as Modules 2-3 |
+| `global_config.device` | Preferred device; the notebook falls back to CPU if CUDA is unavailable |
+| `model_config` | MobileNetV3 target model settings |
+| `surrogate` | MobileNetV2 surrogate training settings |
+| `algorithms.FedAvg.fed_config` | Default clean and attacked FedAvg round/client settings |
+| `attack.malicious_fraction` | Fraction of clients made malicious for attacked FedAvg |
+| `attack.start_round` | First communication round where poisoning is active |
+| `attack.attack.type` | Default poisoning attack, currently `pgd` |
+| `attack.attack.target_label` | Target label used for targeted attack checks and poisoning |
+| `attack.attack.epsilon` | Pixel-space L-infinity budget |
+| `attack.attack.poison_rate` | Fraction of a malicious client's local batch selected for poisoning |
+
+The default FedAvg run uses 8 rounds and starts the attack at round 2. Do not run full Imagenette sweeps unless there is enough workshop time and compute.
+
+---
+
+## Suggested experiments
+
+Run at least two of the following:
+
+### Experiment 1: Random noise vs FGSM vs PGD
+
+Use the default epsilon and compare surrogate robust accuracy across random noise, FGSM, and PGD.
+
+Discussion questions:
+
+* Which perturbation lowers robust accuracy the most?
+* Does random noise behave like an adversarial attack?
+* Does target-label success tell the same story as robust accuracy?
+
+### Experiment 2: Black-box transfer
+
+Compare `target_robust_accuracy`, `surrogate_to_target_transfer_success_rate`, and `target_model_target_label_success_rate` for FGSM and PGD.
+
+Discussion questions:
+
+* Did surrogate-crafted examples transfer to MobileNetV3?
+* Did they merely cause misclassification, or did they move predictions to the configured target label?
+* Why can transfer work even when the target architecture differs?
+
+### Experiment 3: Malicious-client fraction
+
+Use the malicious-fraction sweep to compare 0%, 5%, 10%, and 20% malicious clients.
+
+Discussion questions:
+
+* How does final attacked accuracy change?
+* How does `global_target_label_asr` change?
+* Does surrogate poison success alone prove the final global model learned target-label behavior?
+
+### Experiment 4: Attack budget
+
+Change epsilon from 4/255 to 8/255, keeping the rest of the setup fixed.
+
+Discussion questions:
+
+* Does robust accuracy fall as epsilon grows?
+* Does transfer success rise with epsilon?
+* At what point might perturbations become too visible or unrealistic for the workshop threat model?
+
+---
 
 ## Expected artifacts
 
+After a complete notebook run, inspect these files in `4_Adversarial_FL/artifacts/`.
+
 | Artifact | Purpose |
 | --- | --- |
-| `module4_federated_baseline.json` | Clean FedAvg reference metrics |
 | `module4_config_used.json` | Config snapshot with resolved device |
+| `module4_federated_baseline.json` | Clean FedAvg reference metrics |
+| `module4_fedavg_target.pt` | Clean FedAvg MobileNetV3 target checkpoint used for surrogate-to-target transfer evaluation |
+| `baseline_loss.png` | Clean FedAvg loss curve across rounds |
+| `baseline_accuracy.png` | Clean FedAvg accuracy curve across rounds |
 | `module4_surrogate.json` | Surrogate training and test metrics |
-| `module4_surrogate_attacks.json` | Random, FGSM, and PGD surrogate attack metrics |
-| `module4_transfer_results.json` | MobileNetV2-to-MobileNetV3 transfer metrics |
-| `module4_federated_attacks.json` | Clean vs attacked FedAvg metrics |
-| `module4_fraction_sweep.json` | Malicious-fraction sweep table |
-| `baseline_accuracy.png`, `baseline_loss.png` | Clean training curves |
-| `asr_by_attack.png` | Surrogate attack comparison |
+| `module4_surrogate.pt` | MobileNetV2 surrogate checkpoint used to craft FGSM and PGD examples |
+| `surrogate_history.png` | Surrogate training and validation loss/accuracy curves |
+| `module4_surrogate_attacks.json` | Random, FGSM, and PGD surrogate clean accuracy, robust accuracy, and target-label success metrics |
+| `surrogate_attack_success_by_attack.png` | Surrogate clean accuracy, robust accuracy, and target-label success comparison |
+| `module4_transfer_results.json` | MobileNetV2-to-MobileNetV3 robust accuracy, target-label success, and transfer success metrics |
+| `module4_federated_attacks.json` | Clean vs attacked FedAvg global accuracy, `global_target_label_asr`, and malicious-client poisoning counters |
 | `attack_accuracy.png` | Clean vs attacked FedAvg curve with attack-start marker |
-| `malicious_fraction_sweep.png` | Accuracy and ASR versus malicious-client fraction |
+| `module4_fraction_sweep.json` | Malicious-fraction sweep table with global attacked accuracy, `global_target_label_asr`, poisoned examples, and surrogate poison success rate |
+| `malicious_fraction_sweep.png` | Global attacked accuracy, global target-label ASR, and surrogate poison success rate versus malicious-client fraction |
+
+---
+
+## Checkpoint questions
+
+After completing the module, students should be able to answer:
+
+1. What is an adversarial example?
+2. Why is random noise a useful baseline but not a strong adversary?
+3. How does FGSM choose its perturbation direction?
+4. Why does PGD usually produce stronger attacks than FGSM?
+5. What makes MobileNetV2 the surrogate and MobileNetV3 the target in this module?
+6. What does robust accuracy measure?
+7. What does surrogate-to-target transfer success measure?
+8. What does `global_target_label_asr` measure?
+9. Why is surrogate poison success not enough to prove final global-model target-label behavior?
+10. Which FL algorithm is poisoned in Module 4?
+11. Why do FedOpt and SCAFFOLD need extra work before attacked runs are meaningful?
+12. Why does Module 5 introduce robust aggregation?
+
+---
+
+## Quick self-assessment
+
+Answer in 4-6 sentences:
+
+> Explain the difference between random noise, FGSM, PGD, black-box transfer, and malicious-client FedAvg poisoning. Include which model is attacked or evaluated in each stage, and explain why `global_target_label_asr` is not the same thing as surrogate poison success.
+
+A strong answer should mention:
+
+* random noise is a corruption baseline,
+* FGSM and PGD use surrogate gradients,
+* PGD is iterative and projected,
+* MobileNetV2 crafts attacks while MobileNetV3 is the target,
+* robust accuracy uses the true labels,
+* surrogate poison success is measured on the malicious client's surrogate,
+* `global_target_label_asr` is measured on the final MobileNetV3 global model after poisoned FedAvg,
+* and FedAvg vulnerability motivates Module 5 defenses.
+
+---
+
+## Transition to Module 5
+
+Module 4 shows that FedAvg trusts the average of selected client updates. When some selected clients are malicious, their poisoned local training can influence the global model alongside honest updates. Clean accuracy, robust accuracy, transfer success, and `global_target_label_asr` reveal different parts of that failure mode.
+
+Module 5 asks whether the server can aggregate updates more defensively. It introduces clipping, coordinate-wise median, trimmed mean, Krum, Multi-Krum, and geometric median/RFA as ways to reduce malicious influence while preserving useful honest learning signal.
+
+---
+
+## References
+
+* Goodfellow, Shlens, Szegedy. *Explaining and Harnessing Adversarial Examples* (2014). arXiv:1412.6572.
+* Madry et al. *Towards Deep Learning Models Resistant to Adversarial Attacks* (2017).
+* Papernot et al. *Practical Black-Box Attacks against Machine Learning* (AsiaCCS 2017).
+* Ilyas et al. *Black-Box Adversarial Attacks with Limited Queries and Information* (ICML 2018).
+* Steinhardt, Koh, Liang. *Certified Defenses for Data Poisoning Attacks* (NeurIPS 2017).
+* Bagdasaryan et al. *How to Backdoor Federated Learning* (AISTATS 2020).
+* Bhagoji et al. *Analyzing Federated Learning through an Adversarial Lens* (ICML 2019).
+* Hendrycks, Dietterich. *Benchmarking Neural Network Robustness to Common Corruptions and Perturbations* (ICLR 2019).
+* Sandler, Howard, Zhu, Zhmoginov, Chen. *MobileNetV2: Inverted Residuals and Linear Bottlenecks* (CVPR 2018).
+* Howard et al. *Searching for MobileNetV3* (ICCV 2019).

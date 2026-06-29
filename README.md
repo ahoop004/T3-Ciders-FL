@@ -89,11 +89,11 @@ Compare federated optimizers on a shared workload.
 
 Notebook: `3_Algorithms/Algorithms.ipynb`
 
-### Module 4 — Adversarial Surrogates & Poisoning
+### Module 4 — Adversarial Surrogates & FedAvg Poisoning
 Model black-box adversaries using surrogate models and standard attacks.
-- Target vs surrogate (e.g., MobileNetV3 target, MobileNetV2 surrogate)
+- Target vs surrogate (MobileNetV3 target, MobileNetV2 surrogate)
 - Random noise, FGSM, PGD
-- Compare clean vs attacked behavior and (optionally) FL poisoning dynamics
+- Compare clean accuracy, robust accuracy, transfer success, and FedAvg-only malicious-client poisoning
 
 Notebook: `4_Adversarial_FL/Adv_FL.ipynb`
 

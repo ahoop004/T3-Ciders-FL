@@ -113,7 +113,7 @@ class MaliciousClient(Client):
             "processed_examples": 0,
             "candidate_examples": 0,
             "poisoned_examples": 0,
-            "attack_successes": 0,
+            "surrogate_poison_successes": 0,
         }
 
     def _surrogate_loader(self) -> Optional[DataLoader]:
@@ -187,8 +187,10 @@ class MaliciousClient(Client):
     def get_attack_stats(self) -> Dict[str, Any]:
         stats = dict(self.attack_stats)
         poisoned = int(stats.get("poisoned_examples", 0))
-        successes = int(stats.get("attack_successes", 0))
-        stats["attack_success_rate"] = 100.0 * successes / poisoned if poisoned else 0.0
+        successes = int(stats.get("surrogate_poison_successes", 0))
+        stats["surrogate_poison_success_rate"] = (
+            100.0 * successes / poisoned if poisoned else 0.0
+        )
         return stats
 
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -247,9 +249,13 @@ class MaliciousClient(Client):
                         adv_examples = self.perform_attack(clean_inputs, poison_labels)
                         with torch.no_grad():
                             adv_preds = self.surrogate(adv_examples).argmax(dim=1)
-                            attack_successes = (adv_preds == poison_labels).sum().item()
+                            surrogate_poison_successes = (
+                                adv_preds == poison_labels
+                            ).sum().item()
                         self.attack_stats["poisoned_examples"] += int(mask.sum().item())
-                        self.attack_stats["attack_successes"] += int(attack_successes)
+                        self.attack_stats["surrogate_poison_successes"] += int(
+                            surrogate_poison_successes
+                        )
                         inputs = inputs.clone()
                         labels = labels.clone()
                         inputs[mask] = adv_examples

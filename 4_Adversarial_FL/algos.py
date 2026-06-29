@@ -175,7 +175,7 @@ class Server(BaseServer):
         self.results = {
             "loss": [],
             "accuracy": [],
-            "attack_success_rate": [],
+            "surrogate_poison_success_rate": [],
             "poisoned_examples": [],
             "candidate_examples": [],
             "sampled_malicious_clients": [],
@@ -197,7 +197,9 @@ class Server(BaseServer):
             attack_stats = self.collect_round_attack_stats(client_ids)
             self.results["loss"].append(loss)
             self.results["accuracy"].append(acc)
-            self.results["attack_success_rate"].append(attack_stats["attack_success_rate"])
+            self.results["surrogate_poison_success_rate"].append(
+                attack_stats["surrogate_poison_success_rate"]
+            )
             self.results["poisoned_examples"].append(attack_stats["poisoned_examples"])
             self.results["candidate_examples"].append(attack_stats["candidate_examples"])
             self.results["sampled_malicious_clients"].append(
@@ -211,7 +213,7 @@ class Server(BaseServer):
         totals = {
             "candidate_examples": 0,
             "poisoned_examples": 0,
-            "attack_successes": 0,
+            "surrogate_poison_successes": 0,
             "sampled_malicious_clients": 0,
         }
         for idx in client_ids:
@@ -223,11 +225,15 @@ class Server(BaseServer):
             totals["sampled_malicious_clients"] += 1
             totals["candidate_examples"] += int(stats.get("candidate_examples", 0))
             totals["poisoned_examples"] += int(stats.get("poisoned_examples", 0))
-            totals["attack_successes"] += int(stats.get("attack_successes", 0))
+            totals["surrogate_poison_successes"] += int(
+                stats.get("surrogate_poison_successes", 0)
+            )
 
         poisoned = totals["poisoned_examples"]
-        totals["attack_success_rate"] = (
-            100.0 * totals["attack_successes"] / poisoned if poisoned else 0.0
+        totals["surrogate_poison_success_rate"] = (
+            100.0 * totals["surrogate_poison_successes"] / poisoned
+            if poisoned
+            else 0.0
         )
         return totals
 
