@@ -123,7 +123,7 @@ Module 5 does not introduce new attacks. It reuses the Module 4 attack config:
 ```yaml
 attack:
   malicious_fraction: 0.1
-  start_round: 2
+  start_round: 3
   attack:
     type: "pgd"
     poison_rate: 0.2

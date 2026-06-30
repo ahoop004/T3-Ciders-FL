@@ -5,6 +5,7 @@
 **Teaching:** 25-45 min  
 **Exercises:** 30-60 min  
 **Notebook:** `4_Adversarial_FL/Adv_FL.ipynb`  
+**Split notebooks:** `train_v3.ipynb` → `train_surrogate.ipynb` → `attack_module.ipynb`  
 **Where to run:** ODU HPC (Wahab via Open OnDemand)
 
 This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students build a clean FedAvg MobileNetV3 target model, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, and then run malicious-client FedAvg poisoning experiments.
@@ -96,9 +97,15 @@ FedOpt and SCAFFOLD attack experiments would need additional malicious-client su
 
 ---
 
-## Relation to the notebook
+## Relation to the notebooks
 
-In `Adv_FL.ipynb`, students will:
+`Adv_FL.ipynb` remains the complete top-to-bottom version. The same workflow is also available as three staged notebooks:
+
+1. `train_v3.ipynb` trains the clean FedAvg MobileNetV3 target and writes the baseline metrics/checkpoint.
+2. `train_surrogate.ipynb` trains the MobileNetV2 surrogate and writes the surrogate metrics/checkpoint.
+3. `attack_module.ipynb` loads those artifacts, runs surrogate attacks, evaluates transfer, runs attacked FedAvg, and optionally sweeps malicious-client fraction.
+
+Across the complete or split path, students will:
 
 1. Validate `config.yaml` and save `artifacts/module4_config_used.json`.
 2. Run a clean FedAvg MobileNetV3 baseline and save the target checkpoint.
@@ -106,7 +113,7 @@ In `Adv_FL.ipynb`, students will:
 4. Compare random noise, FGSM, and PGD on the surrogate.
 5. Evaluate MobileNetV2-crafted examples on the MobileNetV3 target.
 6. Run clean vs PGD-poisoned FedAvg under the default malicious-client fraction.
-7. Sweep malicious-client fraction and inspect final attacked accuracy, surrogate poison success, and `global_target_label_asr`.
+7. Optionally sweep malicious-client fraction and inspect final attacked accuracy, surrogate poison success, and `global_target_label_asr`.
 8. Use the artifact guide to connect each saved file to an interpretation question.
 
 The notebook is intended to be run top-to-bottom. The clean FedAvg baseline should be credible before students interpret attack results.
@@ -122,8 +129,15 @@ Main settings are in `4_Adversarial_FL/config.yaml`.
 | `data_config.dataset_path` | Imagenette download/cache location |
 | `data_config.non_iid_per` | Client label-skew severity using the same convention as Modules 2-3 |
 | `global_config.device` | Preferred device; the notebook falls back to CPU if CUDA is unavailable |
+| `artifacts` | Artifact directory and filenames shared by the split notebooks |
 | `model_config` | MobileNetV3 target model settings |
-| `surrogate` | MobileNetV2 surrogate training settings |
+| `target_training` | Split-notebook target stage, including FedAvg handoff algorithm and local SGD learning rate |
+| `surrogate_training` | Split-notebook MobileNetV2 surrogate stage, including optimizer, scheduler, AMP flag, and label smoothing |
+| `attack_module` | Split-notebook attack/evaluation run flags and optional malicious-fraction sweep grid |
+| `surrogate` | Legacy MobileNetV2 surrogate settings kept for `Adv_FL.ipynb` compatibility |
+| `run_control` | Legacy malicious-fraction sweep settings kept for `Adv_FL.ipynb` compatibility |
+| `attack_module.run_malicious_fraction_sweep` | Optional long malicious-fraction sweep toggle for `attack_module.ipynb`; default is `false` |
+| `attack_module.malicious_fraction_grid` | Malicious-client fractions used when the optional split-notebook sweep is enabled |
 | `algorithms.FedAvg.fed_config` | Default clean and attacked FedAvg round/client settings |
 | `attack.malicious_fraction` | Fraction of clients made malicious for attacked FedAvg |
 | `attack.start_round` | First communication round where poisoning is active |
@@ -132,7 +146,11 @@ Main settings are in `4_Adversarial_FL/config.yaml`.
 | `attack.attack.epsilon` | Pixel-space L-infinity budget |
 | `attack.attack.poison_rate` | Fraction of a malicious client's local batch selected for poisoning |
 
-The default FedAvg run uses 8 rounds and starts the attack at round 2. Do not run full Imagenette sweeps unless there is enough workshop time and compute.
+The tuned default FedAvg baseline uses 12 rounds, 3 local epochs, batch size 64, and local stepsize 0.002. With 50 clients and 20% participation, that samples 10 clients per round and gives each selected client several local update steps before averaging.
+
+The default attack activates at round 3, after two clean communication rounds. The standalone surrogate pools 4 client shards and trains a frozen-backbone MobileNetV2 classifier head for up to 4 epochs. The malicious-fraction sweep is optional and disabled by default; enable `attack_module.run_malicious_fraction_sweep` only when there is enough workshop time and compute.
+
+`target_training.optimizer.lr` is wired to the existing Module 4 FedAvg local stepsize for the split target notebook. Momentum, weight decay, and target schedulers are recorded in config but not applied until the Module 4 client update path is refactored away from its explicit SGD-style parameter update. `surrogate_training.optimizer` and `surrogate_training.scheduler` are applied by `train_surrogate.ipynb`; the default is AdamW plus cosine decay.
 
 ---
 
@@ -162,7 +180,7 @@ Discussion questions:
 
 ### Experiment 3: Malicious-client fraction
 
-Use the malicious-fraction sweep to compare 0%, 5%, 10%, and 20% malicious clients.
+Set `attack_module.run_malicious_fraction_sweep: true`, then use the malicious-fraction sweep to compare 0%, 5%, 10%, and 20% malicious clients.
 
 Discussion questions:
 
@@ -184,7 +202,7 @@ Discussion questions:
 
 ## Expected artifacts
 
-After a complete notebook run, inspect these files in `4_Adversarial_FL/artifacts/`.
+After a default notebook run, inspect these files in `4_Adversarial_FL/artifacts/`. The malicious-fraction sweep artifacts are written only when the optional sweep is enabled.
 
 | Artifact | Purpose |
 | --- | --- |
@@ -201,8 +219,8 @@ After a complete notebook run, inspect these files in `4_Adversarial_FL/artifact
 | `module4_transfer_results.json` | MobileNetV2-to-MobileNetV3 robust accuracy, target-label success, and transfer success metrics |
 | `module4_federated_attacks.json` | Clean vs attacked FedAvg global accuracy, `global_target_label_asr`, and malicious-client poisoning counters |
 | `attack_accuracy.png` | Clean vs attacked FedAvg curve with attack-start marker |
-| `module4_fraction_sweep.json` | Malicious-fraction sweep table with global attacked accuracy, `global_target_label_asr`, poisoned examples, and surrogate poison success rate |
-| `malicious_fraction_sweep.png` | Global attacked accuracy, global target-label ASR, and surrogate poison success rate versus malicious-client fraction |
+| `module4_fraction_sweep.json` | Optional malicious-fraction sweep table with global attacked accuracy, `global_target_label_asr`, poisoned examples, and surrogate poison success rate |
+| `malicious_fraction_sweep.png` | Optional global attacked accuracy, global target-label ASR, and surrogate poison success rate versus malicious-client fraction |
 
 ---
 

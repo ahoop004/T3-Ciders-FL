@@ -7,16 +7,87 @@ global_config:
   seed: 42
   device: "cuda"
 
+artifacts:
+  dir: "artifacts"
+  config_snapshot: "module4_config_used.json"
+  target_metrics: "module4_target_training.json"
+  target_history_plot: "target_training_history.png"
+  baseline_metrics: "module4_federated_baseline.json"
+  target_checkpoint: "module4_v3_target.pt"
+  baseline_loss_plot: "baseline_loss.png"
+  baseline_accuracy_plot: "baseline_accuracy.png"
+  surrogate_metrics: "module4_surrogate.json"
+  surrogate_checkpoint: "module4_surrogate.pt"
+  surrogate_history_plot: "surrogate_history.png"
+  surrogate_attack_metrics: "module4_surrogate_attacks.json"
+  surrogate_attack_plot: "surrogate_attack_success_by_attack.png"
+  transfer_metrics: "module4_transfer_results.json"
+  federated_attack_metrics: "module4_federated_attacks.json"
+  federated_attack_plot: "attack_accuracy.png"
+  fraction_sweep_metrics: "module4_fraction_sweep.json"
+  fraction_sweep_plot: "malicious_fraction_sweep.png"
+
+run_control:
+  run_malicious_fraction_sweep: false
+  malicious_fraction_grid: [0.0, 0.05, 0.1, 0.2]
+
+target_training:
+  notebook: "train_v3.ipynb"
+  mode: "centralized"
+  num_epochs: 4
+  batch_size: 64
+  eval_batch_size: 512
+  freeze_backbone: false
+  use_amp: false
+  optimizer:
+    name: "sgd"
+    lr: 0.002
+    momentum: 0.0
+    weight_decay: 0.0
+  scheduler:
+    name: "none"
+
+surrogate_training:
+  notebook: "train_surrogate.ipynb"
+  client_id: 0
+  pool_size: 4
+  num_epochs: 4
+  batch_size: 64
+  freeze_backbone: true
+  augment: true
+  early_stop_patience: 3
+  use_amp: false
+  dataset_path: "./Data/Imagenette"
+  dataset_name: "Imagenette"
+  non_iid_per: 0
+  optimizer:
+    name: "adamw"
+    lr: 0.001
+    weight_decay: 0.0001
+  scheduler:
+    name: "cosine"
+    min_lr: 0.00001
+  criterion:
+    label_smoothing: 0.0
+
+attack_module:
+  notebook: "attack_module.ipynb"
+  run_surrogate_attacks: true
+  run_transfer_attacks: true
+  run_federated_poisoning: true
+  run_malicious_fraction_sweep: false
+  malicious_fraction_grid: [0.0, 0.05, 0.1, 0.2]
+
 surrogate:
   client_id: 0
-  pool_size: 2         # number of client shards to pool for surrogate training
-  num_epochs: 2
-  batch_size: 128
-  learning_rate: 0.0005
+  pool_size: 4         # number of client shards to pool for surrogate training
+  num_epochs: 4
+  batch_size: 64
+  learning_rate: 0.001
   weight_decay: 0.0001
   freeze_backbone: true
   augment: true
-  early_stop_patience: 2
+  early_stop_patience: 3
   dataset_path: "./Data/Imagenette"
   dataset_name: "Imagenette"
   non_iid_per: 0
@@ -33,11 +104,11 @@ algorithms:
     fed_config:
       fraction_clients: 0.2
       num_clients: 50
-      num_rounds: 8
-      num_epochs: 2
-      batch_size: 128
+      num_rounds: 12
+      num_epochs: 3
+      batch_size: 64
       global_stepsize: 1.0
-      local_stepsize: 0.003
+      local_stepsize: 0.002
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config: {}
 
@@ -100,7 +171,7 @@ algorithms:
 attack:
   seed: 42
   malicious_fraction: 0.1
-  start_round: 2
+  start_round: 3
   attack:
     type: "pgd"
     poison_rate: 0.2
@@ -115,10 +186,10 @@ attack:
       end:   0.2
   surrogate:
     pretrained: true
-    finetune_epochs: 3
+    finetune_epochs: 4
     lr: 0.001
     weight_decay: 0.0001
     batch_size: 64
     freeze_backbone: true
     augment: true
-    early_stop_patience: 2
+    early_stop_patience: 3
