@@ -34,11 +34,15 @@ class MobileNetV2Transfer(nn.Module):
 
 
 class MobileNetV3Transfer(nn.Module):
-    def __init__(self, pretrained: bool = True, num_classes: int = 10):
+    def __init__(self, pretrained: bool = True, num_classes: int = 10, dropout: float | None = None):
         super().__init__()
 
         weights = _resolve_weights(pretrained, MobileNet_V3_Small_Weights)
         backbone = tv_models.mobilenet_v3_small(weights=weights)
+        if dropout is not None:
+            for layer in backbone.classifier.modules():
+                if isinstance(layer, nn.Dropout):
+                    layer.p = float(dropout)
         in_feats = backbone.classifier[-1].in_features
         backbone.classifier[-1] = nn.Linear(in_feats, num_classes)
         self.v3model = backbone

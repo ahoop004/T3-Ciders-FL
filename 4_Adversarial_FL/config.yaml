@@ -34,18 +34,48 @@ run_control:
 target_training:
   notebook: "train_v3.ipynb"
   mode: "centralized"
-  num_epochs: 4
-  batch_size: 64
-  eval_batch_size: 512
-  freeze_backbone: false
-  use_amp: false
-  optimizer:
-    name: "sgd"
-    lr: 0.002
-    momentum: 0.0
-    weight_decay: 0.0
-  scheduler:
-    name: "none"
+  profile: "quick"
+  # To override one setting without creating a new profile, add the same key here.
+  # Example: batch_size: 128
+
+target_training_profiles:
+  quick:
+    description: "Fast classroom run for validating the Module 4 handoff artifacts."
+    num_epochs: 4
+    batch_size: 64
+    eval_batch_size: 512
+    freeze_backbone: false
+    use_amp: false
+    early_stop_patience: 0
+    optimizer:
+      name: "sgd"
+      lr: 0.002
+      momentum: 0.0
+      weight_decay: 0.0
+    scheduler:
+      name: "none"
+    criterion:
+      label_smoothing: 0.0
+
+  tuned_imagenette:
+    description: "Longer MobileNetV3-Small fine-tuning run; reduce batch size if GPU memory is tight."
+    num_epochs: 30
+    batch_size: 256
+    eval_batch_size: 512
+    freeze_backbone: false
+    use_amp: true
+    early_stop_patience: 8
+    optimizer:
+      name: "sgd"
+      lr: 0.004
+      momentum: 0.9
+      weight_decay: 0.00004
+    scheduler:
+      name: "warmup_cosine"
+      warmup_epochs: 5
+      min_lr: 0.00001
+    criterion:
+      label_smoothing: 0.0
 
 surrogate_training:
   notebook: "train_surrogate.ipynb"
@@ -98,6 +128,7 @@ model_config:
   kwargs:
     pretrained: true
     num_classes: 10
+    dropout: 0.1
 
 algorithms:
   FedAvg:

@@ -8,7 +8,7 @@
 **Split notebooks:** `train_v3.ipynb` → `train_surrogate.ipynb` → `attack_module.ipynb`  
 **Where to run:** ODU HPC (Wahab via Open OnDemand)
 
-This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students build a clean FedAvg MobileNetV3 target model, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, and then run malicious-client FedAvg poisoning experiments.
+This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students prepare a clean MobileNetV3 target checkpoint, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, and then run malicious-client FedAvg poisoning experiments.
 
 The main lesson is that clean accuracy is not enough. A model can perform well on unmodified Imagenette examples while losing robust accuracy under adversarial perturbations or showing target-label behavior after poisoned FedAvg training. Module 5 uses these failures to motivate defensive aggregation.
 
@@ -68,7 +68,7 @@ All Module 4 attack budgets are interpreted in pixel space. The helper functions
 
 ### MobileNetV2 surrogate vs MobileNetV3 target
 
-The attacker uses MobileNetV2 as a differentiable surrogate and evaluates transfer on the MobileNetV3 target trained by clean FedAvg. This is a black-box transfer setting: the attacker crafts adversarial examples from surrogate gradients rather than target gradients.
+The attacker uses MobileNetV2 as a differentiable surrogate and evaluates transfer on the MobileNetV3 target checkpoint. In the split path that checkpoint comes from centralized `train_v3.ipynb`; in the complete notebook it can come from the clean FedAvg baseline. This is a black-box transfer setting: the attacker crafts adversarial examples from surrogate gradients rather than target gradients.
 
 MobileNetV2 and MobileNetV3 are different architectures, but both are mobile image classifiers with related design patterns. That makes them a useful pair for showing that adversarial examples can transfer even when the attacker does not directly optimize against the target.
 
@@ -101,14 +101,14 @@ FedOpt and SCAFFOLD attack experiments would need additional malicious-client su
 
 `Adv_FL.ipynb` remains the complete top-to-bottom version. The same workflow is also available as three staged notebooks:
 
-1. `train_v3.ipynb` trains the clean FedAvg MobileNetV3 target and writes the baseline metrics/checkpoint.
+1. `train_v3.ipynb` trains the clean centralized MobileNetV3 target and writes the target metrics/checkpoint.
 2. `train_surrogate.ipynb` trains the MobileNetV2 surrogate and writes the surrogate metrics/checkpoint.
 3. `attack_module.ipynb` loads those artifacts, runs surrogate attacks, evaluates transfer, runs attacked FedAvg, and optionally sweeps malicious-client fraction.
 
 Across the complete or split path, students will:
 
 1. Validate `config.yaml` and save `artifacts/module4_config_used.json`.
-2. Run a clean FedAvg MobileNetV3 baseline and save the target checkpoint.
+2. Prepare a clean MobileNetV3 target checkpoint.
 3. Train and sanity-check a MobileNetV2 surrogate.
 4. Compare random noise, FGSM, and PGD on the surrogate.
 5. Evaluate MobileNetV2-crafted examples on the MobileNetV3 target.
@@ -116,7 +116,7 @@ Across the complete or split path, students will:
 7. Optionally sweep malicious-client fraction and inspect final attacked accuracy, surrogate poison success, and `global_target_label_asr`.
 8. Use the artifact guide to connect each saved file to an interpretation question.
 
-The notebook is intended to be run top-to-bottom. The clean FedAvg baseline should be credible before students interpret attack results.
+The notebooks are intended to be run top-to-bottom. The clean target checkpoint and clean FedAvg baseline should be credible before students interpret attack results.
 
 ---
 
@@ -131,7 +131,8 @@ Main settings are in `4_Adversarial_FL/config.yaml`.
 | `global_config.device` | Preferred device; the notebook falls back to CPU if CUDA is unavailable |
 | `artifacts` | Artifact directory and filenames shared by the split notebooks |
 | `model_config` | MobileNetV3 target model settings |
-| `target_training` | Split-notebook target stage, including FedAvg handoff algorithm and local SGD learning rate |
+| `target_training` | Split-notebook target stage selector, including the active target-training profile |
+| `target_training_profiles` | Quick and tuned MobileNetV3 target-training recipes, including optimizer, scheduler, AMP flag, label smoothing, and batch size |
 | `surrogate_training` | Split-notebook MobileNetV2 surrogate stage, including optimizer, scheduler, AMP flag, and label smoothing |
 | `attack_module` | Split-notebook attack/evaluation run flags and optional malicious-fraction sweep grid |
 | `surrogate` | Legacy MobileNetV2 surrogate settings kept for `Adv_FL.ipynb` compatibility |
@@ -150,7 +151,7 @@ The tuned default FedAvg baseline uses 12 rounds, 3 local epochs, batch size 64,
 
 The default attack activates at round 3, after two clean communication rounds. The standalone surrogate pools 4 client shards and trains a frozen-backbone MobileNetV2 classifier head for up to 4 epochs. The malicious-fraction sweep is optional and disabled by default; enable `attack_module.run_malicious_fraction_sweep` only when there is enough workshop time and compute.
 
-`target_training.optimizer.lr` is wired to the existing Module 4 FedAvg local stepsize for the split target notebook. Momentum, weight decay, and target schedulers are recorded in config but not applied until the Module 4 client update path is refactored away from its explicit SGD-style parameter update. `surrogate_training.optimizer` and `surrogate_training.scheduler` are applied by `train_surrogate.ipynb`; the default is AdamW plus cosine decay.
+`target_training.profile` selects the split target-training recipe. The default `quick` profile keeps the classroom run short. The optional `tuned_imagenette` profile uses a larger batch size, SGD momentum, weight decay, warmup plus cosine decay, early stopping, and AMP when CUDA is available. The selected profile is merged into `target_training_effective` in `module4_config_used.json`, so downstream notebooks can see the exact target recipe that produced `module4_v3_target.pt`.
 
 ---
 
@@ -207,8 +208,10 @@ After a default notebook run, inspect these files in `4_Adversarial_FL/artifacts
 | Artifact | Purpose |
 | --- | --- |
 | `module4_config_used.json` | Config snapshot with resolved device |
+| `module4_target_training.json` | Centralized MobileNetV3 target training metrics |
+| `module4_v3_target.pt` | Split-notebook MobileNetV3 target checkpoint used for surrogate-to-target transfer evaluation |
+| `target_training_history.png` | Centralized target loss and top-1 accuracy curves |
 | `module4_federated_baseline.json` | Clean FedAvg reference metrics |
-| `module4_fedavg_target.pt` | Clean FedAvg MobileNetV3 target checkpoint used for surrogate-to-target transfer evaluation |
 | `baseline_loss.png` | Clean FedAvg loss curve across rounds |
 | `baseline_accuracy.png` | Clean FedAvg accuracy curve across rounds |
 | `module4_surrogate.json` | Surrogate training and test metrics |
