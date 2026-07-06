@@ -1,10 +1,15 @@
 data_config:
   dataset_path: "./Data/Imagenette"
+  # Options: "Imagenette" is the supported Module 4 default. The loader can also
+  # resolve many torchvision dataset names, but model_config.kwargs.num_classes
+  # and transforms may need matching edits.
   dataset_name: "Imagenette"
+  # Label-skew severity in [0, 1]. 0 = IID, 1 = very non-IID.
   non_iid_per: 0
 
 global_config:
   seed: 42
+  # Options: "cuda", "cuda:0", "cpu". CUDA choices fall back to CPU if unavailable.
   device: "cuda"
 
 artifacts:
@@ -25,46 +30,71 @@ artifacts:
 
 attack_module:
   notebook: "attack_module.ipynb"
+  # Options: true or false. These toggles let you run only selected sections.
   run_surrogate_attacks: true
   run_transfer_attacks: true
   run_federated_poisoning: true
+  # Options: true or false. The sweep reruns several FedAvg jobs and is slow.
   run_malicious_fraction_sweep: false
+  # Used only when run_malicious_fraction_sweep is true. Values must be in [0, 1].
   malicious_fraction_grid: [0.0, 0.05, 0.1, 0.2]
 
 surrogate_training:
   notebook: "train_surrogate.ipynb"
+  # Client shard used as the first surrogate data source.
   client_id: 0
+  # Number of client shards to pool for surrogate training.
   pool_size: 4
   num_epochs: 4
   batch_size: 64
+  # Options: true freezes the MobileNetV2 feature extractor; false fine-tunes all trainable layers.
   freeze_backbone: true
+  # Options: true applies light image augmentation; false trains on unaugmented shard data.
   augment: true
+  # Options: 0 disables early stopping; positive values stop after this many
+  # validation-loss checks without improvement.
   early_stop_patience: 3
+  # Options: true enables AMP on CUDA; false uses full precision.
   use_amp: false
   dataset_path: "./Data/Imagenette"
+  # Options: keep aligned with data_config.dataset_name unless intentionally
+  # training the surrogate on a different dataset.
   dataset_name: "Imagenette"
+  # Label-skew severity in [0, 1]. Keep aligned with data_config.non_iid_per
+  # unless intentionally changing the surrogate threat model.
   non_iid_per: 0
   optimizer:
+    # Options: "adam", "adamw", "sgd".
     name: "adamw"
     lr: 0.001
     weight_decay: 0.0001
   scheduler:
+    # Options: "none", "cosine", "plateau", "reduce_on_plateau".
     name: "cosine"
+    # Used by cosine only.
     min_lr: 0.00001
   criterion:
+    # CrossEntropyLoss label_smoothing; range [0, 1).
     label_smoothing: 0.0
 
 model_config:
   module: "model"
+  # Options for attack_module.ipynb target model loading: "MobileNetV3Transfer".
   name: "MobileNetV3Transfer"
   kwargs:
+    # Ignored when attack_module loads the saved target checkpoint; kept for
+    # compatibility with the shared model config shape.
     pretrained: true
+    # Must match dataset_name. Imagenette uses 10 classes.
     num_classes: 10
     dropout: 0.1
 
 algorithms:
+  # Options for this split attack notebook: FedAvg only. FedOpt/SCAFFOLD attack
+  # variants need additional malicious-client support.
   FedAvg:
     fed_config:
+      # Fraction of total clients sampled per FL round; range (0, 1].
       fraction_clients: 0.2
       num_clients: 50
       num_rounds: 12
@@ -72,31 +102,46 @@ algorithms:
       batch_size: 64
       global_stepsize: 1.0
       local_stepsize: 0.002
+      # Options: fully qualified torch.nn loss path understood by the server.
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config: {}
 
 attack:
   seed: 42
+  # Fraction of clients made malicious in attacked FedAvg; range [0, 1].
   malicious_fraction: 0.1
+  # First communication round where poisoning is active. Must be < num_rounds.
   start_round: 3
   attack:
+    # Options: "pgd", "fgsm", "random", "random_noise".
     type: "pgd"
+    # Fraction of each malicious local batch selected for poisoning; range [0, 1].
     poison_rate: 0.2
+    # Target class index; must be in [0, num_classes - 1].
     target_label: 0
+    # Pixel-space L-infinity attack budget. Common values: 4/255=0.01568627,
+    # 8/255=0.03137255.
     epsilon: 0.03137255
+    # PGD/FGSM pixel-space step size. For PGD, keep <= epsilon.
     step_size: 0.00784314
+    # Used by PGD only. FGSM uses one step; random noise ignores this.
     iters: 20
+    # Options: fully qualified torch.nn loss path used by the malicious client.
     criterion: "torch.nn.CrossEntropyLoss"
     poison_rate_schedule:
+      # Options: "linear". Remove poison_rate_schedule to use constant poison_rate.
       type: linear
       start: 0.05
       end: 0.2
   surrogate:
+    # Options: true downloads/uses torchvision pretrained weights; false starts randomly.
     pretrained: true
     finetune_epochs: 4
     lr: 0.001
     weight_decay: 0.0001
     batch_size: 64
+    # Options: true freezes the MobileNetV2 feature extractor; false fine-tunes all trainable layers.
     freeze_backbone: true
+    # Options: true applies light image augmentation; false trains without augmentation.
     augment: true
     early_stop_patience: 3
