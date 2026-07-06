@@ -43,6 +43,8 @@ target_training_profiles:
     early_stop_patience: 0
     optimizer:
       # Options: "sgd", "local_sgd", "adam", "adamw".
+      # LR scale depends on optimizer: SGD/local_sgd can use larger values;
+      # Adam/AdamW fine-tuning usually starts around 0.0001-0.0003.
       name: "sgd"
       lr: 0.002
       # Used by SGD/local_sgd only.
@@ -67,6 +69,8 @@ target_training_profiles:
     early_stop_patience: 8
     optimizer:
       # Options: "sgd", "local_sgd", "adam", "adamw".
+      # LR scale depends on optimizer: SGD/local_sgd can use larger values;
+      # Adam/AdamW fine-tuning usually starts around 0.0001-0.0003.
       name: "sgd"
       lr: 0.004
       # Used by SGD/local_sgd only.
