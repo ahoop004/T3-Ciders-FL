@@ -23,7 +23,7 @@ global_config:
 
 artifacts:
   dir: "artifacts"
-  config_snapshot: "module4_config_used.json"
+  config_snapshot: "module4_target_config_used.json"
   target_metrics: "module4_target_training.json"
   target_checkpoint: "module4_v3_target.pt"
   target_history_plot: "target_training_history.png"

@@ -79,26 +79,77 @@ target_training_profiles:
 
 surrogate_training:
   notebook: "train_surrogate.ipynb"
+  mode: "centralized"
+  profile: "quick"
+  data_view: "client_pool"
   client_id: 0
   pool_size: 4
-  num_epochs: 4
-  batch_size: 64
-  freeze_backbone: true
-  augment: true
-  early_stop_patience: 3
-  use_amp: false
   dataset_path: "./Data/Imagenette"
   dataset_name: "Imagenette"
   non_iid_per: 0
-  optimizer:
-    name: "adamw"
-    lr: 0.001
-    weight_decay: 0.0001
-  scheduler:
-    name: "cosine"
-    min_lr: 0.00001
-  criterion:
-    label_smoothing: 0.0
+
+surrogate_training_profiles:
+  quick:
+    description: "Target-aligned MobileNetV2 surrogate smoke test over the configured attacker data view."
+    num_epochs: 4
+    batch_size: 64
+    eval_batch_size: 512
+    pretrained: true
+    freeze_backbone: false
+    augment: false
+    use_amp: false
+    early_stop_patience: 0
+    optimizer:
+      name: "sgd"
+      lr: 0.002
+      momentum: 0.0
+      weight_decay: 0.0
+    scheduler:
+      name: "none"
+    criterion:
+      label_smoothing: 0.0
+
+  tuned_imagenette:
+    description: "Longer target-aligned MobileNetV2 surrogate fine-tuning run."
+    num_epochs: 30
+    batch_size: 256
+    eval_batch_size: 512
+    pretrained: true
+    freeze_backbone: false
+    augment: false
+    use_amp: true
+    early_stop_patience: 8
+    optimizer:
+      name: "sgd"
+      lr: 0.004
+      momentum: 0.9
+      weight_decay: 0.00004
+    scheduler:
+      name: "warmup_cosine"
+      warmup_epochs: 5
+      min_lr: 0.00001
+    criterion:
+      label_smoothing: 0.0
+
+  attacker_pool:
+    description: "Legacy stronger attacker-pool recipe with frozen MobileNetV2 features and augmentation."
+    num_epochs: 4
+    batch_size: 64
+    eval_batch_size: 512
+    pretrained: true
+    freeze_backbone: true
+    augment: true
+    use_amp: false
+    early_stop_patience: 3
+    optimizer:
+      name: "adamw"
+      lr: 0.001
+      weight_decay: 0.0001
+    scheduler:
+      name: "cosine"
+      min_lr: 0.00001
+    criterion:
+      label_smoothing: 0.0
 
 attack_module:
   notebook: "attack_module.ipynb"
@@ -109,15 +160,17 @@ attack_module:
   malicious_fraction_grid: [0.0, 0.05, 0.1, 0.2]
 
 surrogate:
+  # Compatibility values for Adv_FL.ipynb, which still reads this block directly.
   client_id: 0
   pool_size: 4         # number of client shards to pool for surrogate training
   num_epochs: 4
   batch_size: 64
-  learning_rate: 0.001
-  weight_decay: 0.0001
-  freeze_backbone: true
-  augment: true
-  early_stop_patience: 3
+  pretrained: true
+  learning_rate: 0.002
+  weight_decay: 0.0
+  freeze_backbone: false
+  augment: false
+  early_stop_patience: 0
   dataset_path: "./Data/Imagenette"
   dataset_name: "Imagenette"
   non_iid_per: 0
@@ -216,11 +269,11 @@ attack:
       start: 0.05
       end:   0.2
   surrogate:
-    pretrained: true
-    finetune_epochs: 4
-    lr: 0.001
-    weight_decay: 0.0001
+    pretrained: false
+    finetune_epochs: 0
+    lr: 0.002
+    weight_decay: 0.0
     batch_size: 64
-    freeze_backbone: true
-    augment: true
-    early_stop_patience: 3
+    freeze_backbone: false
+    augment: false
+    early_stop_patience: 0

@@ -23,28 +23,28 @@ global_config:
 
 artifacts:
   dir: "artifacts"
-  config_snapshot: "module4_config_used.json"
+  config_snapshot: "module4_surrogate_config_used.json"
   surrogate_metrics: "module4_surrogate.json"
   surrogate_checkpoint: "module4_surrogate.pt"
   surrogate_history_plot: "surrogate_history.png"
 
 surrogate_training:
   notebook: "train_surrogate.ipynb"
-  # Client shard used as the first surrogate data source.
+  # Options: "centralized". A single saved MobileNetV2 surrogate is trained
+  # once and reused by the attack notebook.
+  mode: "centralized"
+  # Options: "quick", "tuned_imagenette", "attacker_pool", or another key
+  # added under surrogate_training_profiles.
+  profile: "quick"
+  # Options: "client_pool" keeps the attacker limited to pooled client shards;
+  # "full_train" intentionally gives the surrogate the full training set.
+  data_view: "client_pool"
+  # Client shard used as the first surrogate data source when data_view=client_pool.
   client_id: 0
-  # Number of client shards to pool for surrogate training.
+  # Number of client shards to pool when data_view=client_pool.
   pool_size: 4
-  num_epochs: 4
-  batch_size: 64
-  # Options: true freezes the MobileNetV2 feature extractor; false fine-tunes all trainable layers.
-  freeze_backbone: true
-  # Options: true applies light image augmentation; false trains on unaugmented shard data.
-  augment: true
-  # Options: 0 disables early stopping; positive values stop after this many
-  # validation-loss checks without improvement.
-  early_stop_patience: 3
-  # Options: true enables AMP on CUDA; false uses full precision.
-  use_amp: false
+  # To override one setting without creating a new profile, add the same key here.
+  # Example: batch_size: 128
   dataset_path: "./Data/Imagenette"
   # Options: keep aligned with data_config.dataset_name unless intentionally
   # training the surrogate on a different dataset.
@@ -54,19 +54,78 @@ surrogate_training:
   # Label-skew severity in [0, 1]. Keep aligned with data_config.non_iid_per
   # unless intentionally changing the surrogate threat model.
   non_iid_per: 0
-  optimizer:
-    # Options: "adam", "adamw", "sgd".
-    name: "adamw"
-    lr: 0.001
-    weight_decay: 0.0001
-  scheduler:
-    # Options: "none", "cosine", "plateau", "reduce_on_plateau".
-    name: "cosine"
-    # Used by cosine only.
-    min_lr: 0.00001
-  criterion:
-    # CrossEntropyLoss label_smoothing; range [0, 1).
-    label_smoothing: 0.0
+
+surrogate_training_profiles:
+  quick:
+    description: "Target-aligned MobileNetV2 surrogate smoke test over the configured attacker data view."
+    num_epochs: 4
+    batch_size: 64
+    eval_batch_size: 512
+    # Options: true downloads/uses torchvision pretrained weights; false starts randomly.
+    pretrained: true
+    # Options: true freezes the MobileNetV2 feature extractor; false fine-tunes all trainable layers.
+    freeze_backbone: false
+    # Options: true applies light image augmentation; false trains on the base data transform only.
+    augment: false
+    # Options: true enables AMP on CUDA; false uses full precision.
+    use_amp: false
+    # Options: 0 disables early stopping; positive values stop after this many
+    # validation-loss checks without improvement.
+    early_stop_patience: 0
+    optimizer:
+      # Options: "sgd", "local_sgd", "adam", "adamw".
+      name: "sgd"
+      lr: 0.002
+      momentum: 0.0
+      weight_decay: 0.0
+    scheduler:
+      # Options: "none", "cosine", "warmup_cosine", "plateau", "reduce_on_plateau".
+      name: "none"
+    criterion:
+      # CrossEntropyLoss label_smoothing; range [0, 1).
+      label_smoothing: 0.0
+
+  tuned_imagenette:
+    description: "Longer target-aligned MobileNetV2 surrogate fine-tuning run."
+    num_epochs: 30
+    batch_size: 256
+    eval_batch_size: 512
+    pretrained: true
+    freeze_backbone: false
+    augment: false
+    use_amp: true
+    early_stop_patience: 8
+    optimizer:
+      name: "sgd"
+      lr: 0.004
+      momentum: 0.9
+      weight_decay: 0.00004
+    scheduler:
+      name: "warmup_cosine"
+      warmup_epochs: 5
+      min_lr: 0.00001
+    criterion:
+      label_smoothing: 0.0
+
+  attacker_pool:
+    description: "Legacy stronger attacker-pool recipe with frozen MobileNetV2 features and augmentation."
+    num_epochs: 4
+    batch_size: 64
+    eval_batch_size: 512
+    pretrained: true
+    freeze_backbone: true
+    augment: true
+    use_amp: false
+    early_stop_patience: 3
+    optimizer:
+      name: "adamw"
+      lr: 0.001
+      weight_decay: 0.0001
+    scheduler:
+      name: "cosine"
+      min_lr: 0.00001
+    criterion:
+      label_smoothing: 0.0
 
 model_config:
   kwargs:

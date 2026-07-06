@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import torch
@@ -70,6 +71,7 @@ class MaliciousClient(Client):
             pretrained=self.surrogate_params.get("pretrained", True),
             num_classes=num_classes,
         ).to(self.device)
+        self._load_surrogate_checkpoint_if_configured()
         if self.surrogate_params.get("freeze_backbone", False) and hasattr(self.surrogate, "v2model"):
             for param in self.surrogate.v2model.features.parameters():
                 param.requires_grad = False
@@ -90,6 +92,26 @@ class MaliciousClient(Client):
         self.ft_batch_size = int(self.surrogate_params.get("batch_size", default_batch_size))
         self._surrogate_dataset = getattr(local_data, "dataset", None)
         self._early_stop_patience = int(self.surrogate_params.get("early_stop_patience", 0))
+
+    def _load_surrogate_checkpoint_if_configured(self) -> None:
+        checkpoint = self.surrogate_params.get("checkpoint") or self.surrogate_params.get(
+            "checkpoint_path"
+        )
+        if not checkpoint:
+            return
+
+        checkpoint_path = Path(checkpoint)
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(
+                f"Configured surrogate checkpoint does not exist: {checkpoint_path}"
+            )
+        state = torch.load(checkpoint_path, map_location="cpu")
+        if isinstance(state, dict) and "model_state" in state:
+            state = state["model_state"]
+        elif isinstance(state, dict) and "state_dict" in state:
+            state = state["state_dict"]
+        self.surrogate.load_state_dict(state)
+        self.surrogate.to(self.device)
 
     def on_round_start(self, round_idx: int, total_rounds: int) -> None:
         super().on_round_start(round_idx, total_rounds)
