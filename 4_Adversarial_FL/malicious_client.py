@@ -38,6 +38,8 @@ class MaliciousClient(Client):
 
         self.attack_params = self.attack_config.get("attack", {})
         self.surrogate_params = self.attack_config.get("surrogate", {})
+        self.poison_generation_model = "MobileNetV2Transfer"
+        self.target_gradients_used_for_poison_generation = False
 
         self.poison_rate = float(self.attack_params.get("poison_rate", 0.0))
         schedule_cfg = self.attack_params.get("poison_rate_schedule")
@@ -110,7 +112,13 @@ class MaliciousClient(Client):
             state = state["model_state"]
         elif isinstance(state, dict) and "state_dict" in state:
             state = state["state_dict"]
-        self.surrogate.load_state_dict(state)
+        try:
+            self.surrogate.load_state_dict(state)
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Configured surrogate checkpoint is incompatible with the "
+                f"{self.poison_generation_model} attacker model: {checkpoint_path}"
+            ) from exc
         self.surrogate.to(self.device)
 
     def on_round_start(self, round_idx: int, total_rounds: int) -> None:
@@ -136,6 +144,10 @@ class MaliciousClient(Client):
             "candidate_examples": 0,
             "poisoned_examples": 0,
             "surrogate_poison_successes": 0,
+            "poison_generation_model": self.poison_generation_model,
+            "target_gradients_used_for_poison_generation": (
+                self.target_gradients_used_for_poison_generation
+            ),
         }
 
     def _surrogate_loader(self) -> Optional[DataLoader]:
@@ -216,6 +228,12 @@ class MaliciousClient(Client):
         return stats
 
     def perform_attack(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Craft poisoned inputs with the surrogate model only.
+
+        The global/target MobileNetV3 model is never used for gradients here;
+        ``self.surrogate`` is the attack model loaded from the configured
+        MobileNetV2 checkpoint.
+        """
         attack_key = self.attack_type
         kwargs: Dict[str, Any] = {"images": x}
         targeted = bool(self.attack_params.get("targeted", self.target_label is not None))
@@ -245,6 +263,49 @@ class MaliciousClient(Client):
 
         return self.attack_fn(**kwargs)
 
+    def poison_batch(
+        self,
+        inputs: torch.Tensor,
+        labels: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Poison a local minibatch and update poisoning counters.
+
+        Subclasses for FedOpt and SCAFFOLD call this helper so every
+        algorithm uses the same black-box surrogate poison path.
+        """
+        self.attack_stats["processed_examples"] += int(labels.size(0))
+
+        poison_rate = self._current_poison_rate if self._attack_active else 0.0
+        if poison_rate <= 0.0:
+            return inputs, labels
+
+        if self.target_label is None:
+            raise ValueError("`target_label` must be provided when poisoning is active.")
+
+        self.attack_stats["candidate_examples"] += int(labels.size(0))
+        mask = torch.rand(labels.size(0), device=self.device) < poison_rate
+        if not mask.any():
+            return inputs, labels
+
+        clean_inputs = inputs[mask]
+        poison_labels = torch.full_like(labels[mask], int(self.target_label))
+        self.surrogate.eval()
+        adv_examples = self.perform_attack(clean_inputs, poison_labels)
+        with torch.no_grad():
+            adv_preds = self.surrogate(adv_examples).argmax(dim=1)
+            surrogate_poison_successes = (adv_preds == poison_labels).sum().item()
+
+        self.attack_stats["poisoned_examples"] += int(mask.sum().item())
+        self.attack_stats["surrogate_poison_successes"] += int(
+            surrogate_poison_successes
+        )
+
+        poisoned_inputs = inputs.clone()
+        poisoned_labels = labels.clone()
+        poisoned_inputs[mask] = adv_examples
+        poisoned_labels[mask] = poison_labels
+        return poisoned_inputs, poisoned_labels
+
     def client_update(self) -> None:
         if self.x is None:
             raise ValueError("Client model `x` has not been initialised by the server.")
@@ -258,30 +319,7 @@ class MaliciousClient(Client):
             for inputs, labels in self.data:
                 inputs = inputs.float().to(self.device)
                 labels = labels.long().to(self.device)
-                self.attack_stats["processed_examples"] += int(labels.size(0))
-
-                poison_rate = self._current_poison_rate if self._attack_active else 0.0
-                if poison_rate > 0.0:
-                    self.attack_stats["candidate_examples"] += int(labels.size(0))
-                    mask = torch.rand(labels.size(0), device=self.device) < poison_rate
-                    if mask.any():
-                        clean_inputs = inputs[mask]
-                        poison_labels = torch.full_like(labels[mask], int(self.target_label))
-                        self.surrogate.eval()
-                        adv_examples = self.perform_attack(clean_inputs, poison_labels)
-                        with torch.no_grad():
-                            adv_preds = self.surrogate(adv_examples).argmax(dim=1)
-                            surrogate_poison_successes = (
-                                adv_preds == poison_labels
-                            ).sum().item()
-                        self.attack_stats["poisoned_examples"] += int(mask.sum().item())
-                        self.attack_stats["surrogate_poison_successes"] += int(
-                            surrogate_poison_successes
-                        )
-                        inputs = inputs.clone()
-                        labels = labels.clone()
-                        inputs[mask] = adv_examples
-                        labels[mask] = poison_labels
+                inputs, labels = self.poison_batch(inputs, labels)
 
                 outputs = self.y(inputs)
                 loss = self.criterion(outputs, labels)

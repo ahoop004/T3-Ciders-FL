@@ -34,19 +34,39 @@ artifacts:
   transfer_metrics: "module4_transfer_results.json"
   federated_attack_metrics: "module4_federated_attacks.json"
   federated_attack_plot: "attack_accuracy.png"
+  federated_attack_asr_plot: "global_target_label_asr.png"
   fraction_sweep_metrics: "module4_fraction_sweep.json"
   fraction_sweep_plot: "malicious_fraction_sweep.png"
+  algorithm_comparison_metrics: "module4_algorithm_comparison.json"
+  algorithm_comparison_plot: "algorithm_comparison.png"
+  fast_validation_metrics: "module4_fast_validation.json"
 
 attack_module:
   notebook: "attack_module.ipynb"
+  # Algorithm used by the clean and attacked FL runs below.
+  # Options: "FedAvg", "FedAdam", "FedAdagrad", "FedYogi", "Scaffold".
+  selected_algorithm: "FedAvg"
   # Options: true or false. These toggles let you run only selected sections.
   run_surrogate_attacks: true
   run_transfer_attacks: true
   run_federated_poisoning: true
-  # Options: true or false. The sweep reruns several FedAvg jobs and is slow.
+  # Options: true or false. The sweep reruns several selected-algorithm FL jobs and is slow.
   run_malicious_fraction_sweep: false
+  # Options: true or false. Runs a tiny SyntheticSmoke wiring check for all algorithms.
+  run_fast_validation: false
+  # Options: true or false. Runs clean and attacked FL for each algorithm below.
+  run_algorithm_comparison: false
+  # Used only when run_algorithm_comparison is true. Keep data_config and attack
+  # recipe fixed so only the FL algorithm changes where possible.
+  algorithm_comparison_algorithms: ["FedAvg", "FedAdam", "FedAdagrad", "FedYogi", "Scaffold"]
+  # Options: "pgd_default", "fgsm_default", or "random_noise".
+  algorithm_comparison_attack_recipe: "pgd_default"
   # Used only when run_malicious_fraction_sweep is true. Values must be in [0, 1].
   malicious_fraction_grid: [0.0, 0.05, 0.1, 0.2]
+  # Poison-generation dry run shown before FL starts.
+  poison_demo_recipe: "pgd_default"
+  poison_demo_batch_size: 8
+  visualize_poison_demo: true
 
 surrogate_training:
   notebook: "train_surrogate.ipynb"
@@ -148,8 +168,9 @@ model_config:
     dropout: 0.1
 
 algorithms:
-  # Options for this split attack notebook: FedAvg only. FedOpt/SCAFFOLD attack
-  # variants need additional malicious-client support.
+  # Each algorithm exposes the same normal FL controls:
+  # fraction_clients, num_clients, num_rounds, num_epochs, batch_size,
+  # global_stepsize (server learning rate), local_stepsize, and criterion.
   FedAvg:
     fed_config:
       # Fraction of total clients sampled per FL round; range (0, 1].
@@ -164,11 +185,72 @@ algorithms:
       criterion: "torch.nn.CrossEntropyLoss"
     optim_config: {}
 
+  FedAdam:
+    fed_config:
+      fraction_clients: 0.2
+      num_clients: 50
+      num_rounds: 12
+      num_epochs: 3
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.002
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      beta1: 0.9
+      beta2: 0.99
+      epsilon: 0.000001
+
+  FedAdagrad:
+    fed_config:
+      fraction_clients: 0.2
+      num_clients: 50
+      num_rounds: 12
+      num_epochs: 3
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.002
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      epsilon: 0.000001
+
+  FedYogi:
+    fed_config:
+      fraction_clients: 0.2
+      num_clients: 50
+      num_rounds: 12
+      num_epochs: 3
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.002
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      beta1: 0.9
+      beta2: 0.99
+      epsilon: 0.000001
+
+  Scaffold:
+    fed_config:
+      fraction_clients: 0.2
+      num_clients: 50
+      num_rounds: 12
+      num_epochs: 3
+      batch_size: 64
+      global_stepsize: 0.1
+      local_stepsize: 0.002
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config:
+      c_init: 0.0
+
 attack:
   seed: 42
-  # Fraction of clients made malicious in attacked FedAvg; range [0, 1].
+  # Fraction of clients made malicious in attacked FL; range [0, 1].
   malicious_fraction: 0.1
-  # First communication round where poisoning is active. Must be < num_rounds.
+  malicious_client_selection:
+    # Options: "seeded_random", "first", "last", "all", "none", "explicit".
+    mode: "seeded_random"
+    # Optional deterministic override. Leave empty to use malicious_fraction.
+    client_ids: []
+  # First communication round where poisoning is active. Must not be after the final round.
   start_round: 3
   attack:
     # Options: "pgd", "fgsm", "random", "random_noise".
@@ -192,7 +274,17 @@ attack:
       start: 0.05
       end: 0.2
   surrogate:
-    # Fallback defaults only. The attack notebook normally injects the saved
-    # module4_surrogate.pt checkpoint into malicious clients.
+    # The attack notebook resolves this to artifacts.surrogate_checkpoint when
+    # omitted or null. Keep explicit here so provenance includes the attacker's
+    # intended surrogate checkpoint source.
+    checkpoint: "artifacts/module4_surrogate.pt"
+    checkpoint_source: "train_surrogate.ipynb"
     pretrained: false
+    # Optional per-malicious-client surrogate fine-tuning before local poisoning.
     finetune_epochs: 0
+    local_finetune_epochs: 0
+    batch_size: 64
+    learning_rate: 0.001
+    weight_decay: 0.0
+    freeze_backbone: false
+    early_stop_patience: 0

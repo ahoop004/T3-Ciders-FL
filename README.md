@@ -92,16 +92,16 @@ Compare federated optimizers on a shared workload.
 
 Notebook: `3_Algorithms/Algorithms.ipynb`
 
-### Module 4 — Adversarial Surrogates & FedAvg Poisoning
+### Module 4 — Adversarial Surrogates & Federated Poisoning
 Model black-box adversaries using surrogate models and standard attacks.
 - Target vs surrogate (MobileNetV3 target, MobileNetV2 surrogate)
 - Random noise, FGSM, PGD
-- Compare clean accuracy, robust accuracy, transfer success, and FedAvg-only malicious-client poisoning
+- Compare clean accuracy, robust accuracy, transfer success, and malicious-client poisoning across the selected supported FL algorithm
 
 Notebook: `4_Adversarial_FL/Adv_FL.ipynb`
 
 ### Module 5 — Defensive Federated Learning
-Defend against malicious-client FedAvg poisoning with robust aggregation.
+Defend against the Module 4 malicious-client path with robust aggregation.
 - FedAvg control, clipping, coordinate-wise median, trimmed mean, Krum, Multi-Krum, and geometric median / RFA
 - Compare clean accuracy, attacked accuracy, defense recovery, surrogate poison success, and `global_target_label_asr`
 - Stress defenses under malicious-fraction and non-IID sweeps
