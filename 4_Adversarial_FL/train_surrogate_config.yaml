@@ -6,6 +6,15 @@ data_config:
   dataset_name: "Imagenette"
   # Label-skew severity in [0, 1]. 0 = IID, 1 = very non-IID.
   non_iid_per: 0
+  # Options: "selection" for checkpoint selection/early stopping, "attack_eval"
+  # for held-out attack evaluation, "all" for the full validation set.
+  eval_subset: "selection"
+  validation_split:
+    enabled: true
+    seed: 42
+    # Fraction of Imagenette val reserved for checkpoint selection. The
+    # remainder is held out for attack evaluation.
+    selection_fraction: 0.5
 
 global_config:
   seed: 42
@@ -40,6 +49,8 @@ surrogate_training:
   # Options: keep aligned with data_config.dataset_name unless intentionally
   # training the surrogate on a different dataset.
   dataset_name: "Imagenette"
+  # Keep this aligned with data_config.eval_subset for normal runs.
+  eval_subset: "selection"
   # Label-skew severity in [0, 1]. Keep aligned with data_config.non_iid_per
   # unless intentionally changing the surrogate threat model.
   non_iid_per: 0

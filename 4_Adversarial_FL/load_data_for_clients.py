@@ -12,6 +12,7 @@ re-partitioning on every run.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import pickle
 import sys
@@ -23,7 +24,7 @@ from torch.utils.data import DataLoader
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from common.data_utils import make_client_loaders
-from util_functions import create_data
+from util_functions import create_data, select_validation_subset
 
 
 def dist_data_per_client(
@@ -33,6 +34,8 @@ def dist_data_per_client(
     batch_size: int,
     non_iid_per: float,
     device: torch.device,
+    validation_split: dict | None = None,
+    eval_subset: str = "all",
 ) -> Tuple[List[DataLoader], DataLoader]:
     """Return (client_loaders, test_loader) using Dirichlet label-skew partitioning.
 
@@ -49,13 +52,20 @@ def dist_data_per_client(
         batch_size: Mini-batch size for every client DataLoader.
         non_iid_per: Label-skew severity in [0, 1].  0 = IID, 1 = very skewed.
         device: Unused — kept for API compatibility with existing callers.
+        validation_split: Optional deterministic validation split config.
+        eval_subset: ``"selection"``, ``"attack_eval"``, or ``"all"`` for the
+            shared evaluation loader.
 
     Returns:
         ``(client_loaders, test_loader)``
     """
     print("\nPreparing data with Dirichlet partitioner (aligned with Module 2)")
 
-    cache_key = f"dirichlet_{dataset_name}_{num_clients}_{batch_size}_{non_iid_per}".encode()
+    split_key = json.dumps(validation_split or {}, sort_keys=True)
+    cache_key = (
+        f"dirichlet_{dataset_name}_{num_clients}_{batch_size}_{non_iid_per}_"
+        f"{eval_subset}_{split_key}"
+    ).encode()
     cache_hash = hashlib.md5(cache_key).hexdigest()
     os.makedirs("cache", exist_ok=True)
     cache_file = os.path.join("cache", f"client_data_{cache_hash}.pkl")
@@ -66,6 +76,7 @@ def dist_data_per_client(
             return pickle.load(f)
 
     train_ds, test_ds = create_data(data_path, dataset_name)
+    test_ds = select_validation_subset(test_ds, validation_split, eval_subset)
     result = make_client_loaders(train_ds, test_ds, num_clients, batch_size, non_iid_per)
 
     with open(cache_file, "wb") as f:

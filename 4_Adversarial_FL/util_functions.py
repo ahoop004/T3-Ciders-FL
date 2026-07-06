@@ -11,7 +11,7 @@ from typing import Any, Callable, Tuple, Type
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision import datasets, transforms
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
@@ -168,6 +168,83 @@ def create_data(data_path: str, dataset_name: str):
             test_data.data = test_data.data.unsqueeze(3)
 
     return train_data, test_data
+
+
+def select_validation_subset(
+    dataset: Dataset,
+    split_config: dict[str, Any] | None,
+    subset: str = "all",
+) -> Dataset:
+    """Return a deterministic validation subset for model selection or attacks.
+
+    ``selection`` is intended for validation loss, early stopping, and checkpoint
+    selection. ``attack_eval`` is held out for attack evaluation. ``all`` returns
+    the original dataset unchanged.
+    """
+    subset_key = str(subset or "all").lower()
+    subset_aliases = {
+        "all": "all",
+        "full": "all",
+        "none": "all",
+        "selection": "selection",
+        "select": "selection",
+        "val": "selection",
+        "val_select": "selection",
+        "validation": "selection",
+        "attack": "attack_eval",
+        "attack_eval": "attack_eval",
+        "heldout": "attack_eval",
+        "held_out": "attack_eval",
+        "test": "attack_eval",
+    }
+    if subset_key not in subset_aliases:
+        raise ValueError(
+            f"Unknown validation subset {subset!r}. Use one of: all, selection, attack_eval."
+        )
+    subset_key = subset_aliases[subset_key]
+    if subset_key == "all":
+        return dataset
+
+    cfg = split_config or {}
+    if not bool(cfg.get("enabled", False)):
+        return dataset
+
+    n_items = len(dataset)
+    if n_items == 0:
+        return dataset
+
+    selection_fraction = float(cfg.get("selection_fraction", 0.5))
+    if not 0.0 < selection_fraction < 1.0:
+        raise ValueError("validation_split.selection_fraction must be in (0, 1).")
+
+    seed = int(cfg.get("seed", 42))
+    rng = np.random.default_rng(seed)
+    targets = _extract_targets(dataset)
+    if targets is not None and len(targets) == n_items:
+        targets = np.asarray(targets)
+        selected_parts = []
+        attack_eval_parts = []
+        for label in np.unique(targets):
+            class_indices = np.where(targets == label)[0]
+            rng.shuffle(class_indices)
+            n_selection = int(round(len(class_indices) * selection_fraction))
+            if len(class_indices) > 1:
+                n_selection = min(max(n_selection, 1), len(class_indices) - 1)
+            selected_parts.extend(class_indices[:n_selection])
+            attack_eval_parts.extend(class_indices[n_selection:])
+        selected = np.array(selected_parts, dtype=int)
+        attack_eval = np.array(attack_eval_parts, dtype=int)
+    else:
+        indices = np.arange(n_items)
+        rng.shuffle(indices)
+        n_selection = int(round(n_items * selection_fraction))
+        if n_items > 1:
+            n_selection = min(max(n_selection, 1), n_items - 1)
+        selected = indices[:n_selection]
+        attack_eval = indices[n_selection:]
+
+    chosen = selected if subset_key == "selection" else attack_eval
+    return Subset(dataset, sorted(int(idx) for idx in chosen))
 
 
 def _extract_targets(dataset) -> list[int] | None:
@@ -327,6 +404,7 @@ __all__ = [
     "resolve_callable",
     "run_fl",
     "save_plt",
+    "select_validation_subset",
     "set_logger",
     "set_seed",
     "target_label_prediction_rate",

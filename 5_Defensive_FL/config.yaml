@@ -2,6 +2,11 @@ data_config:
   dataset_path: "./Data/Imagenette"
   dataset_name: "Imagenette"
   non_iid_per: 0.0
+  eval_subset: "attack_eval"
+  validation_split:
+    enabled: true
+    seed: 42
+    selection_fraction: 0.5
 
 global_config:
   seed: 42

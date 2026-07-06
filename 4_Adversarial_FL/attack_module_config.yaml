@@ -6,6 +6,15 @@ data_config:
   dataset_name: "Imagenette"
   # Label-skew severity in [0, 1]. 0 = IID, 1 = very non-IID.
   non_iid_per: 0
+  # Options: "attack_eval" for held-out attack evaluation, "selection" for the
+  # checkpoint-selection split, "all" for the full validation set.
+  eval_subset: "attack_eval"
+  validation_split:
+    enabled: true
+    seed: 42
+    # Must match the training configs. The first half is used for checkpoint
+    # selection; the remainder is reserved for attacks.
+    selection_fraction: 0.5
 
 global_config:
   seed: 42

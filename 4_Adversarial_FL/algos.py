@@ -101,6 +101,8 @@ class Server(BaseServer):
             self.batch_size,
             self.non_iid_per,
             self.device,
+            validation_split=self.data_config.get("validation_split"),
+            eval_subset=self.data_config.get("eval_subset", "all"),
         )
         self.test_loader = test_dataset
         self.clients = self.create_clients(local_datasets)

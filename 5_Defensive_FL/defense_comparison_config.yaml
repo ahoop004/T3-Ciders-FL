@@ -1,0 +1,88 @@
+data_config:
+  dataset_path: "./Data/Imagenette"
+  dataset_name: "Imagenette"
+  non_iid_per: 0
+  eval_subset: "attack_eval"
+  validation_split:
+    enabled: true
+    seed: 42
+    selection_fraction: 0.5
+
+global_config:
+  seed: 42
+  device: "cuda"
+
+artifacts:
+  dir: "artifacts"
+  config_snapshot: "module5_defense_comparison_config_used.json"
+  clean_baseline_metrics: "module5_clean_fedavg.json"
+  attacked_baseline_metrics: "module5_attacked_fedavg.json"
+  comparison_metrics: "module5_defense_comparison.json"
+  comparison_table: "module5_defense_comparison.csv"
+
+stage:
+  name: "defense_comparison"
+  notebook: "defense_comparison.ipynb"
+
+model_config:
+  module: "model"
+  name: "MobileNetV3Transfer"
+  kwargs:
+    pretrained: true
+    num_classes: 10
+    dropout: 0.1
+
+algorithms:
+  FedAvg:
+    fed_config:
+      algorithm: "FedAvg"
+      fraction_clients: 0.2
+      num_clients: 50
+      num_rounds: 12
+      num_epochs: 3
+      batch_size: 64
+      global_stepsize: 1.0
+      local_stepsize: 0.002
+      criterion: "torch.nn.CrossEntropyLoss"
+    optim_config: {}
+
+defense:
+  name: "trimmed_mean"
+  trim_fraction: 0.1
+
+attack:
+  seed: 42
+  malicious_fraction: 0.1
+  start_round: 3
+  attack:
+    type: "pgd"
+    poison_rate: 0.2
+    target_label: 0
+    epsilon: 0.03137255
+    step_size: 0.00784314
+    iters: 20
+    criterion: "torch.nn.CrossEntropyLoss"
+    poison_rate_schedule:
+      type: "linear"
+      start: 0.05
+      end: 0.2
+  surrogate:
+    pretrained: true
+    finetune_epochs: 4
+    lr: 0.001
+    weight_decay: 0.0001
+    batch_size: 64
+    freeze_backbone: true
+    augment: true
+    early_stop_patience: 3
+
+experiments:
+  defenses:
+    - name: "fedavg"
+    - name: "clipping"
+      clip_norm: 5.0
+    - name: "median"
+    - name: "trimmed_mean"
+      trim_fraction: 0.1
+    - name: "krum"
+      byzantine_f: 2

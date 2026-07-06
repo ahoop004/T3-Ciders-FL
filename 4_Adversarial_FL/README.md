@@ -138,6 +138,8 @@ Key split-workflow controls:
 | --- | --- |
 | `data_config.dataset_path` | Imagenette download/cache location |
 | `data_config.non_iid_per` | Client label-skew severity using the same convention as Modules 2-3 |
+| `data_config.validation_split` | Deterministic split of Imagenette `val` into checkpoint-selection and attack-evaluation subsets |
+| `data_config.eval_subset` | Active subset for a notebook: `selection` in target/surrogate training, `attack_eval` in the attack notebook |
 | `global_config.device` | Preferred device; the notebooks fall back to CPU if CUDA is unavailable |
 | `artifacts` | Artifact directory and filenames for the stage that owns the config |
 | `target_training.profile` | Active target-training profile for `train_v3.ipynb` |
@@ -154,6 +156,8 @@ Key split-workflow controls:
 | `attack.attack.poison_rate` | Fraction of a malicious client's local batch selected for poisoning |
 
 The tuned default FedAvg baseline uses 12 rounds, 3 local epochs, batch size 64, and local stepsize 0.002. With 50 clients and 20% participation, that samples 10 clients per round and gives each selected client several local update steps before averaging.
+
+By default, Module 4 now splits Imagenette `val` 50/50 using `data_config.validation_split.seed`. When labels are available, the split is stratified so each half keeps roughly the same class mix. `train_v3.ipynb` and `train_surrogate.ipynb` use the `selection` subset for validation loss, early stopping, and checkpoint selection. `attack_module.ipynb` uses the separate `attack_eval` subset for surrogate attacks, transfer evaluation, and FedAvg attack metrics.
 
 The default attack activates at round 3, after two clean communication rounds. The standalone surrogate pools 4 client shards and trains a frozen-backbone MobileNetV2 classifier head for up to 4 epochs. The malicious-fraction sweep is optional and disabled by default; enable `attack_module.run_malicious_fraction_sweep` in `attack_module_config.yaml` only when there is enough workshop time and compute.
 
