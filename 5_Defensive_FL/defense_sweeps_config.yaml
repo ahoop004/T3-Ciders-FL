@@ -12,6 +12,12 @@ global_config:
   seed: 42
   device: "cuda"
 
+module4_handoff:
+  enabled: true
+  artifacts_dir: "../4_Adversarial_FL/artifacts"
+  target_checkpoint: "module4_v3_target.pt"
+  surrogate_checkpoint: "module4_surrogate.pt"
+
 artifacts:
   dir: "artifacts"
   config_snapshot: "module5_defense_sweeps_config_used.json"
@@ -21,15 +27,15 @@ stage:
   notebook: "defense_sweeps.ipynb"
 
 defense_sweeps:
-  run_malicious_fraction_sweep: true
-  run_krum_hyperparameter_sweep: true
-  run_non_iid_stress: true
+  run_malicious_fraction_sweep: false
+  run_krum_hyperparameter_sweep: false
+  run_non_iid_stress: false
 
 model_config:
   module: "model"
   name: "MobileNetV3Transfer"
   kwargs:
-    pretrained: true
+    pretrained: false
     num_classes: 10
     dropout: 0.1
 
@@ -54,6 +60,9 @@ defense:
 attack:
   seed: 42
   malicious_fraction: 0.1
+  malicious_client_selection:
+    mode: "seeded_random"
+    client_ids: []
   start_round: 3
   attack:
     type: "pgd"
@@ -68,14 +77,16 @@ attack:
       start: 0.05
       end: 0.2
   surrogate:
-    pretrained: true
-    finetune_epochs: 4
-    lr: 0.001
-    weight_decay: 0.0001
+    checkpoint: "../4_Adversarial_FL/artifacts/module4_surrogate.pt"
+    checkpoint_source: "train_surrogate.ipynb"
+    pretrained: false
+    finetune_epochs: 0
+    local_finetune_epochs: 0
+    learning_rate: 0.001
+    weight_decay: 0.0
     batch_size: 64
-    freeze_backbone: true
-    augment: true
-    early_stop_patience: 3
+    freeze_backbone: false
+    early_stop_patience: 0
 
 experiments:
   defenses:

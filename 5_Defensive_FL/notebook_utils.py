@@ -67,6 +67,8 @@ class Module5Context:
     model_config: dict[str, Any]
     optim_config: dict[str, Any]
     base_attack_config: dict[str, Any]
+    module4_handoff: dict[str, Any]
+    initial_checkpoint: Path | None
 
     @property
     def expected_rounds(self) -> int:
@@ -78,6 +80,85 @@ class Module5Context:
 
     def artifact_path(self, name: str | Path) -> Path:
         return self.artifact_dir / name
+
+
+def prepare_module4_handoff(
+    config: Mapping[str, Any],
+    *,
+    require_artifacts: bool = True,
+) -> tuple[dict[str, Any], Path | None]:
+    """Resolve Module 4 target/surrogate handoff artifacts for Module 5 runs."""
+
+    normalized = deepcopy(dict(config))
+    handoff = deepcopy(normalized.get("module4_handoff", {}))
+    enabled = bool(handoff.get("enabled", False))
+    if not enabled:
+        normalized["module4_handoff"] = {"enabled": False}
+        return normalized, None
+
+    artifacts_dir = Path(handoff.get("artifacts_dir", MODULE4_DIR / "artifacts"))
+    if not artifacts_dir.is_absolute():
+        artifacts_dir = MODULE_DIR / artifacts_dir
+    artifacts_dir = artifacts_dir.resolve()
+
+    target_checkpoint = _resolve_handoff_file(
+        handoff.get("target_checkpoint", "module4_v3_target.pt"),
+        artifacts_dir,
+    )
+    surrogate_checkpoint = _resolve_handoff_file(
+        handoff.get("surrogate_checkpoint", "module4_surrogate.pt"),
+        artifacts_dir,
+    )
+
+    missing = [
+        path
+        for path in (target_checkpoint, surrogate_checkpoint)
+        if not path.exists()
+    ]
+    if require_artifacts and missing:
+        missing_names = ", ".join(str(path) for path in missing)
+        raise FileNotFoundError(
+            "Module 5 handoff requires Module 4 artifacts that are missing: "
+            f"{missing_names}. Run Module 4 train_v3.ipynb and "
+            "train_surrogate.ipynb first, or set module4_handoff.enabled=false "
+            "for smoke runs."
+        )
+
+    resolved_handoff = {
+        **handoff,
+        "enabled": True,
+        "artifacts_dir": str(artifacts_dir),
+        "target_checkpoint": str(target_checkpoint),
+        "surrogate_checkpoint": str(surrogate_checkpoint),
+    }
+    normalized["module4_handoff"] = resolved_handoff
+
+    attack_config = deepcopy(normalized.get("attack", {}))
+    surrogate_config = deepcopy(attack_config.get("surrogate", {}))
+    surrogate_config["checkpoint"] = str(surrogate_checkpoint)
+    surrogate_config.setdefault("checkpoint_source", "train_surrogate.ipynb")
+    surrogate_config.setdefault("pretrained", False)
+    surrogate_config.setdefault("finetune_epochs", 0)
+    surrogate_config.setdefault("local_finetune_epochs", 0)
+    surrogate_config.setdefault("batch_size", 64)
+    surrogate_config.setdefault("learning_rate", 0.001)
+    surrogate_config.setdefault("weight_decay", 0.0)
+    surrogate_config.setdefault("freeze_backbone", False)
+    surrogate_config.setdefault("early_stop_patience", 0)
+    attack_config["surrogate"] = surrogate_config
+    normalized["attack"] = attack_config
+
+    return normalized, target_checkpoint
+
+
+def _resolve_handoff_file(value: str | Path, artifacts_dir: Path) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path.resolve()
+    candidate = artifacts_dir / path
+    if candidate.exists() or len(path.parts) == 1:
+        return candidate.resolve()
+    return (MODULE_DIR / path).resolve()
 
 
 def load_context(
@@ -99,6 +180,7 @@ def load_context(
     normalized = deepcopy(config)
     normalized["fed_config"] = fed_config
     normalized["optim_config"] = optim_config
+    normalized, initial_checkpoint = prepare_module4_handoff(normalized)
 
     issues = validate_module5_config(normalized, require_attack=require_attack)
     if issues:
@@ -121,6 +203,8 @@ def load_context(
         model_config=normalized["model_config"],
         optim_config=optim_config,
         base_attack_config=normalized["attack"],
+        module4_handoff=normalized.get("module4_handoff", {"enabled": False}),
+        initial_checkpoint=initial_checkpoint,
     )
     print(
         f"Loaded {context.config_path.name}: stage={context.stage_name}, "
@@ -147,6 +231,7 @@ def record_config_snapshot(
         "data_config": context.data_config,
         "fed_config": context.fed_config,
         "attack": context.base_attack_config,
+        "module4_handoff": context.module4_handoff,
         "experiments": context.config.get("experiments", {}),
     }
     if extra:
@@ -332,6 +417,7 @@ def run_module5_experiment(
         optim_config=context.optim_config,
         attack_config=dict(attack_config),
         defense_config=dict(defense_config),
+        initial_checkpoint=context.initial_checkpoint,
     )
     result = server.results
     save_json(result, run_result_path(context, run_name))
@@ -709,6 +795,7 @@ __all__ = [
     "load_run_result",
     "make_attack_config",
     "make_skipped_row",
+    "prepare_module4_handoff",
     "record_config_snapshot",
     "run_defense_comparison",
     "run_fedavg_baselines",

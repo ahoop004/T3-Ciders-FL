@@ -13,6 +13,7 @@ import os
 import sys
 import time
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Sequence, Type
 
 import torch
@@ -380,6 +381,7 @@ def run_defensive_fl(
     attack_config: dict[str, Any] | None = None,
     defense_config: dict[str, Any] | None = None,
     server_cls: Type[DefensiveServer] | None = None,
+    initial_checkpoint: str | os.PathLike[str] | None = None,
 ) -> DefensiveServer:
     """Spin up a defensive server, train it, and return the trained server."""
     optim_config = optim_config or {}
@@ -409,9 +411,51 @@ def run_defensive_fl(
     )
     logging.info("Defensive server initialized")
     server.setup()
+    if initial_checkpoint is not None:
+        load_initial_checkpoint(server, initial_checkpoint)
+        logging.info("Initialized defensive server from %s", initial_checkpoint)
     server.train()
     logging.info("\nExecution has completed")
     return server
+
+
+def load_initial_checkpoint(
+    server: DefensiveServer,
+    checkpoint: str | os.PathLike[str],
+) -> None:
+    """Load a Module 4 target checkpoint into a defensive server."""
+
+    checkpoint_path = Path(checkpoint)
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(
+            "Module 5 handoff target checkpoint is missing: "
+            f"{checkpoint_path}. Run Module 4 train_v3.ipynb first or disable "
+            "module4_handoff for smoke runs."
+        )
+
+    state = torch.load(checkpoint_path, map_location="cpu")
+    if isinstance(state, dict):
+        if isinstance(state.get("model_state"), dict):
+            state = state["model_state"]
+        elif isinstance(state.get("state_dict"), dict):
+            state = state["state_dict"]
+    if not isinstance(state, dict):
+        raise RuntimeError(
+            "Initial checkpoint must be a state dict or contain a 'model_state' "
+            f"or 'state_dict' entry: {checkpoint_path}"
+        )
+
+    try:
+        server.global_model.load_state_dict(state, strict=True)
+    except RuntimeError as exc:
+        raise RuntimeError(
+            "Module 4 target checkpoint is incompatible with the Module 5 "
+            f"global model: {checkpoint_path}"
+        ) from exc
+
+    server.global_model.to(server.device)
+    server.x = server.global_model
+    server.initial_checkpoint_path = str(checkpoint_path)
 
 
 def validate_module5_config(
@@ -558,7 +602,10 @@ def make_attack_config(
     """Return a copy of an attack config with common overrides applied."""
     attack_config = deepcopy(base_attack_config)
     if malicious_fraction is not None:
-        attack_config["malicious_fraction"] = float(malicious_fraction)
+        fraction = float(malicious_fraction)
+        attack_config["malicious_fraction"] = fraction
+        if fraction == 0.0:
+            attack_config["malicious_client_selection"] = {"mode": "none"}
     if poison_rate is not None:
         attack_config.setdefault("attack", {})["poison_rate"] = float(poison_rate)
     return attack_config
@@ -591,6 +638,7 @@ __all__ = [
     "SERVER_REGISTRY",
     "TrimmedMeanServer",
     "get_defensive_server_class",
+    "load_initial_checkpoint",
     "make_attack_config",
     "run_defensive_fl",
     "sampled_client_count",
