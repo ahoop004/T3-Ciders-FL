@@ -141,7 +141,8 @@ Recommended:
 ## Configuration Notes
 
 - Modules 1–2: most hyperparameters are defined directly in the notebook cells.
-- Modules 3–5: use `config.yaml` in the module directory for experiment settings (so you can tweak runs without editing core code).
+- Modules 3 and 5: use `config.yaml` in the module directory for experiment settings.
+- Module 4 split workflow: use `train_v3_config.yaml`, `train_surrogate_config.yaml`, and `attack_module_config.yaml` next to the staged notebooks. The complete `Adv_FL.ipynb` still uses `config.yaml`.
 
 If a module directory includes its own README, follow that module’s README first.
 

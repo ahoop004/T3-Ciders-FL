@@ -1,0 +1,49 @@
+data_config:
+  dataset_path: "./Data/Imagenette"
+  dataset_name: "Imagenette"
+  non_iid_per: 0
+
+global_config:
+  seed: 42
+  device: "cuda"
+
+artifacts:
+  dir: "artifacts"
+  config_snapshot: "module4_config_used.json"
+  surrogate_metrics: "module4_surrogate.json"
+  surrogate_checkpoint: "module4_surrogate.pt"
+  surrogate_history_plot: "surrogate_history.png"
+
+surrogate_training:
+  notebook: "train_surrogate.ipynb"
+  client_id: 0
+  pool_size: 4
+  num_epochs: 4
+  batch_size: 64
+  freeze_backbone: true
+  augment: true
+  early_stop_patience: 3
+  use_amp: false
+  dataset_path: "./Data/Imagenette"
+  dataset_name: "Imagenette"
+  non_iid_per: 0
+  optimizer:
+    name: "adamw"
+    lr: 0.001
+    weight_decay: 0.0001
+  scheduler:
+    name: "cosine"
+    min_lr: 0.00001
+  criterion:
+    label_smoothing: 0.0
+
+model_config:
+  kwargs:
+    num_classes: 10
+
+algorithms:
+  FedAvg:
+    fed_config:
+      num_clients: 50
+      batch_size: 64
+    optim_config: {}

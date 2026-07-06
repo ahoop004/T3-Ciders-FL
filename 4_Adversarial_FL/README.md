@@ -91,7 +91,7 @@ Do not collapse these into a generic "ASR." In this module, ASR is only used whe
 
 ### FedAvg poisoning scope
 
-`config.yaml` lists FedAvg, FedAdam, FedAdagrad, FedYogi, and Scaffold/SCAFFOLD so clean baselines can share one configuration file. The malicious-client poisoning path is currently wired only for the FedAvg server path.
+`attack_module_config.yaml` lists the FedAvg settings used by the split malicious-client notebook. The complete `Adv_FL.ipynb` still uses `config.yaml`, which includes the clean FedAvg, FedAdam, FedAdagrad, FedYogi, and Scaffold/SCAFFOLD baseline settings.
 
 FedOpt and SCAFFOLD attack experiments would need additional malicious-client support because those paths use optimizer-specific update fields and, for SCAFFOLD, control-variate state. Teach the Module 4 FL poisoning section as a FedAvg poisoning experiment.
 
@@ -107,7 +107,7 @@ FedOpt and SCAFFOLD attack experiments would need additional malicious-client su
 
 Across the complete or split path, students will:
 
-1. Validate `config.yaml` and save `artifacts/module4_config_used.json`.
+1. Validate the relevant config and save `artifacts/module4_config_used.json`. The split path uses `train_v3_config.yaml`, `train_surrogate_config.yaml`, and `attack_module_config.yaml`; the complete notebook uses `config.yaml`.
 2. Prepare a clean MobileNetV3 target checkpoint.
 3. Train and sanity-check a MobileNetV2 surrogate.
 4. Compare random noise, FGSM, and PGD on the surrogate.
@@ -122,24 +122,30 @@ The notebooks are intended to be run top-to-bottom. The clean target checkpoint 
 
 ## Configuration notes
 
-Main settings are in `4_Adversarial_FL/config.yaml`.
+The split notebooks each load a stage-specific config in `4_Adversarial_FL/`.
+
+| Config | Used by | Main settings |
+| --- | --- | --- |
+| `train_v3_config.yaml` | `train_v3.ipynb` | `data_config`, `global_config`, target artifacts, `model_config`, `target_training`, and `target_training_profiles` |
+| `train_surrogate_config.yaml` | `train_surrogate.ipynb` | `data_config`, `global_config`, surrogate artifacts, `model_config`, and `surrogate_training` |
+| `attack_module_config.yaml` | `attack_module.ipynb` | `data_config`, `global_config`, attack artifacts, `surrogate_training`, FedAvg settings, `attack_module`, and `attack` |
+
+The complete `Adv_FL.ipynb` remains compatible with the legacy `config.yaml`.
+
+Key split-workflow controls:
 
 | Key | What it controls |
 | --- | --- |
 | `data_config.dataset_path` | Imagenette download/cache location |
 | `data_config.non_iid_per` | Client label-skew severity using the same convention as Modules 2-3 |
-| `global_config.device` | Preferred device; the notebook falls back to CPU if CUDA is unavailable |
-| `artifacts` | Artifact directory and filenames shared by the split notebooks |
-| `model_config` | MobileNetV3 target model settings |
-| `target_training` | Split-notebook target stage selector, including the active target-training profile |
+| `global_config.device` | Preferred device; the notebooks fall back to CPU if CUDA is unavailable |
+| `artifacts` | Artifact directory and filenames for the stage that owns the config |
+| `target_training.profile` | Active target-training profile for `train_v3.ipynb` |
 | `target_training_profiles` | Quick and tuned MobileNetV3 target-training recipes, including optimizer, scheduler, AMP flag, label smoothing, and batch size |
-| `surrogate_training` | Split-notebook MobileNetV2 surrogate stage, including optimizer, scheduler, AMP flag, and label smoothing |
-| `attack_module` | Split-notebook attack/evaluation run flags and optional malicious-fraction sweep grid |
-| `surrogate` | Legacy MobileNetV2 surrogate settings kept for `Adv_FL.ipynb` compatibility |
-| `run_control` | Legacy malicious-fraction sweep settings kept for `Adv_FL.ipynb` compatibility |
+| `surrogate_training` | MobileNetV2 surrogate stage settings, including optimizer, scheduler, AMP flag, and label smoothing |
 | `attack_module.run_malicious_fraction_sweep` | Optional long malicious-fraction sweep toggle for `attack_module.ipynb`; default is `false` |
 | `attack_module.malicious_fraction_grid` | Malicious-client fractions used when the optional split-notebook sweep is enabled |
-| `algorithms.FedAvg.fed_config` | Default clean and attacked FedAvg round/client settings |
+| `algorithms.FedAvg.fed_config` | Clean and attacked FedAvg round/client settings |
 | `attack.malicious_fraction` | Fraction of clients made malicious for attacked FedAvg |
 | `attack.start_round` | First communication round where poisoning is active |
 | `attack.attack.type` | Default poisoning attack, currently `pgd` |
@@ -149,9 +155,9 @@ Main settings are in `4_Adversarial_FL/config.yaml`.
 
 The tuned default FedAvg baseline uses 12 rounds, 3 local epochs, batch size 64, and local stepsize 0.002. With 50 clients and 20% participation, that samples 10 clients per round and gives each selected client several local update steps before averaging.
 
-The default attack activates at round 3, after two clean communication rounds. The standalone surrogate pools 4 client shards and trains a frozen-backbone MobileNetV2 classifier head for up to 4 epochs. The malicious-fraction sweep is optional and disabled by default; enable `attack_module.run_malicious_fraction_sweep` only when there is enough workshop time and compute.
+The default attack activates at round 3, after two clean communication rounds. The standalone surrogate pools 4 client shards and trains a frozen-backbone MobileNetV2 classifier head for up to 4 epochs. The malicious-fraction sweep is optional and disabled by default; enable `attack_module.run_malicious_fraction_sweep` in `attack_module_config.yaml` only when there is enough workshop time and compute.
 
-`target_training.profile` selects the split target-training recipe. The default `quick` profile keeps the classroom run short. The optional `tuned_imagenette` profile uses a larger batch size, SGD momentum, weight decay, warmup plus cosine decay, early stopping, and AMP when CUDA is available. The selected profile is merged into `target_training_effective` in `module4_config_used.json`, so downstream notebooks can see the exact target recipe that produced `module4_v3_target.pt`.
+`target_training.profile` in `train_v3_config.yaml` selects the split target-training recipe. The default `quick` profile keeps the classroom run short. The optional `tuned_imagenette` profile uses a larger batch size, SGD momentum, weight decay, warmup plus cosine decay, early stopping, and AMP when CUDA is available. The selected profile is merged into `target_training_effective` in `module4_config_used.json`, so downstream notebooks can see the exact target recipe that produced `module4_v3_target.pt`.
 
 ---
 
@@ -181,7 +187,7 @@ Discussion questions:
 
 ### Experiment 3: Malicious-client fraction
 
-Set `attack_module.run_malicious_fraction_sweep: true`, then use the malicious-fraction sweep to compare 0%, 5%, 10%, and 20% malicious clients.
+Set `attack_module.run_malicious_fraction_sweep: true` in `attack_module_config.yaml`, then use the malicious-fraction sweep to compare 0%, 5%, 10%, and 20% malicious clients.
 
 Discussion questions:
 
