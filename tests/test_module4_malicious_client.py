@@ -368,6 +368,12 @@ def test_attack_module_exposes_algorithm_comparison_option():
 
     attack_module = config["attack_module"]
     artifacts = config["artifacts"]
+    assert attack_module["run_attack_recipe_sweep"] is False
+    assert attack_module["attack_recipe_sweep_recipes"] == [
+        "random_noise",
+        "fgsm_default",
+        "pgd_default",
+    ]
     assert attack_module["run_algorithm_comparison"] is False
     assert attack_module["algorithm_comparison_attack_recipe"] == "pgd_default"
     assert set(attack_module["algorithm_comparison_algorithms"]) == {
@@ -377,6 +383,8 @@ def test_attack_module_exposes_algorithm_comparison_option():
         "FedYogi",
         "Scaffold",
     }
+    assert artifacts["attack_recipe_sweep_metrics"] == "module4_attack_recipe_sweep.json"
+    assert artifacts["attack_recipe_sweep_plot"] == "attack_recipe_sweep.png"
     assert artifacts["algorithm_comparison_metrics"] == "module4_algorithm_comparison.json"
     assert artifacts["algorithm_comparison_plot"] == "algorithm_comparison.png"
 
@@ -384,6 +392,9 @@ def test_attack_module_exposes_algorithm_comparison_option():
     notebook = json.loads(notebook_path.read_text())
     notebook_source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
 
+    assert "RUN_ATTACK_RECIPE_SWEEP" in notebook_source
+    assert "run_attack_recipe_sweep(" in notebook_source
+    assert "module4_attack_recipe_sweep.json" in notebook_source
     assert "RUN_ALGORITHM_COMPARISON" in notebook_source
     assert "run_algorithm_comparison(" in notebook_source
     assert "build_clean_attacked_summary_row" in notebook_source

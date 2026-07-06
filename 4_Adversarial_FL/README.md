@@ -8,7 +8,7 @@
 **Split notebooks:** `train_v3.ipynb` → `train_surrogate.ipynb` → `attack_module.ipynb`  
 **Where to run:** ODU HPC (Wahab via Open OnDemand)
 
-This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students prepare a clean MobileNetV3 target checkpoint, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, run malicious-client poisoning experiments for the selected supported FL algorithm, and optionally compare several algorithms under the same attack recipe.
+This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students prepare a clean MobileNetV3 target checkpoint, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, run malicious-client poisoning experiments for the selected supported FL algorithm, optionally sweep FL poisoning recipes, and optionally compare several algorithms under the same attack recipe.
 
 The main lesson is that clean accuracy is not enough. A model can perform well on unmodified Imagenette examples while losing robust accuracy under adversarial perturbations or showing target-label behavior after poisoned FL training. Module 5 uses these failures to motivate defensive aggregation.
 
@@ -24,8 +24,9 @@ By the end of this module, students should be able to:
 4. Distinguish clean accuracy, robust accuracy, transfer success, target-label success, surrogate poison success, and `global_target_label_asr`.
 5. Explain how malicious clients poison part of local training during FL.
 6. Describe why FedOpt clients must report `delta_y` and SCAFFOLD clients must preserve control-variate state.
-7. Compare supported FL algorithms under a shared malicious-client attack recipe.
-8. Explain why malicious-client poisoning motivates Module 5 defenses.
+7. Compare random-noise, FGSM, and PGD poisoning recipes under the same selected FL algorithm.
+8. Compare supported FL algorithms under a shared malicious-client attack recipe.
+9. Explain why malicious-client poisoning motivates Module 5 defenses.
 
 ---
 
@@ -104,7 +105,7 @@ FedOpt-style malicious clients poison local minibatches and then report `delta_y
 
 1. `train_v3.ipynb` trains the clean centralized MobileNetV3 target and writes the target metrics/checkpoint.
 2. `train_surrogate.ipynb` trains the MobileNetV2 surrogate and writes the surrogate metrics/checkpoint.
-3. `attack_module.ipynb` loads those artifacts, runs surrogate attacks, evaluates transfer, runs clean-vs-attacked FL for the selected algorithm, optionally sweeps malicious-client fraction, and optionally compares configured algorithms under one attack recipe.
+3. `attack_module.ipynb` loads those artifacts, runs surrogate attacks, evaluates transfer, runs clean-vs-attacked FL for the selected algorithm, optionally sweeps attack recipes or malicious-client fraction, and optionally compares configured algorithms under one attack recipe.
 
 Across the complete or split path, students will:
 
@@ -114,9 +115,10 @@ Across the complete or split path, students will:
 4. Compare random noise, FGSM, and PGD on the surrogate.
 5. Evaluate MobileNetV2-crafted examples on the MobileNetV3 target.
 6. Run clean vs PGD-poisoned FL under the default malicious-client fraction.
-7. Optionally sweep malicious-client fraction and inspect final attacked accuracy, surrogate poison success, and `global_target_label_asr`.
-8. Optionally compare algorithms under a shared attack recipe and inspect final clean accuracy, final attacked accuracy, accuracy drop, surrogate poison success, and `global_target_label_asr`.
-9. Use the artifact guide to connect each saved file to an interpretation question.
+7. Optionally sweep attack recipes and inspect final attacked accuracy, accuracy drop, surrogate poison success, and `global_target_label_asr`.
+8. Optionally sweep malicious-client fraction and inspect final attacked accuracy, surrogate poison success, and `global_target_label_asr`.
+9. Optionally compare algorithms under a shared attack recipe and inspect final clean accuracy, final attacked accuracy, accuracy drop, surrogate poison success, and `global_target_label_asr`.
+10. Use the artifact guide to connect each saved file to an interpretation question.
 
 The notebooks are intended to be run top-to-bottom. The clean target checkpoint and clean FedAvg baseline should be credible before students interpret attack results.
 
@@ -147,6 +149,8 @@ Key split-workflow controls:
 | `target_training.profile` | Active target-training profile for `train_v3.ipynb` |
 | `target_training_profiles` | Quick and tuned MobileNetV3 target-training recipes, including optimizer, scheduler, AMP flag, label smoothing, and batch size |
 | `surrogate_training` | MobileNetV2 surrogate stage settings, including centralized mode, active profile, attacker data view, optimizer, scheduler, AMP flag, and label smoothing |
+| `attack_module.run_attack_recipe_sweep` | Optional long sweep that runs clean FL once and attacked FL for each configured poisoning recipe; default is `false` |
+| `attack_module.attack_recipe_sweep_recipes` | Poisoning recipes included when attack-recipe sweep mode is enabled |
 | `attack_module.run_malicious_fraction_sweep` | Optional long malicious-fraction sweep toggle for `attack_module.ipynb`; default is `false` |
 | `attack_module.malicious_fraction_grid` | Malicious-client fractions used when the optional split-notebook sweep is enabled |
 | `attack_module.run_algorithm_comparison` | Optional long comparison mode that runs clean and attacked FL for each configured comparison algorithm; default is `false` |
@@ -165,7 +169,7 @@ The tuned default selected-algorithm baseline uses 12 rounds, 3 local epochs, ba
 
 By default, Module 4 now splits Imagenette `val` 50/50 using `data_config.validation_split.seed`. When labels are available, the split is stratified so each half keeps roughly the same class mix. `train_v3.ipynb` and `train_surrogate.ipynb` use the `selection` subset for validation loss, early stopping, and checkpoint selection. `attack_module.ipynb` uses the separate `attack_eval` subset for surrogate attacks, transfer evaluation, and selected-algorithm attack metrics.
 
-The default attack activates at round 3, after two clean communication rounds. The standalone surrogate is now a centralized MobileNetV2 training stage over the configured attacker data view. By default it pools 4 client shards, fine-tunes with the target-aligned `quick` profile, saves one `module4_surrogate.pt` checkpoint, and the attack notebook reuses that checkpoint for poisoning. The malicious-fraction sweep and algorithm comparison modes are optional and disabled by default; enable `attack_module.run_malicious_fraction_sweep` or `attack_module.run_algorithm_comparison` in `attack_module_config.yaml` only when there is enough workshop time and compute.
+The default attack activates at round 3, after two clean communication rounds. The standalone surrogate is now a centralized MobileNetV2 training stage over the configured attacker data view. By default it pools 4 client shards, fine-tunes with the target-aligned `quick` profile, saves one `module4_surrogate.pt` checkpoint, and the attack notebook reuses that checkpoint for poisoning. The attack-recipe sweep, malicious-fraction sweep, and algorithm comparison modes are optional and disabled by default; enable `attack_module.run_attack_recipe_sweep`, `attack_module.run_malicious_fraction_sweep`, or `attack_module.run_algorithm_comparison` in `attack_module_config.yaml` only when there is enough workshop time and compute.
 
 `target_training.profile` in `train_v3_config.yaml` selects the split target-training recipe. The default `quick` profile keeps the classroom run short. The optional `tuned_imagenette` profile uses a larger batch size, SGD momentum, weight decay, warmup plus cosine decay, early stopping, and AMP when CUDA is available. The selected profile is merged into `target_training_effective` in `module4_target_config_used.json`, so downstream notebooks can see the exact target recipe that produced `module4_v3_target.pt`. The surrogate uses the same profile pattern through `surrogate_training.profile` and records `surrogate_training_effective` in `module4_surrogate_config_used.json`.
 
@@ -206,7 +210,17 @@ Discussion questions:
 * Did they merely cause misclassification, or did they move predictions to the configured target label?
 * Why can transfer work even when the target architecture differs?
 
-### Experiment 3: Malicious-client fraction
+### Experiment 3: Federated attack recipe sweep
+
+Set `attack_module.run_attack_recipe_sweep: true` in `attack_module_config.yaml`, then compare random-noise, FGSM, and PGD poisoning under the selected FL algorithm.
+
+Discussion questions:
+
+* Which poisoning recipe creates the largest attacked-accuracy drop?
+* Does `global_target_label_asr` move in the same direction as attacked accuracy?
+* Is high surrogate poison success enough to predict final global-model behavior?
+
+### Experiment 4: Malicious-client fraction
 
 Set `attack_module.run_malicious_fraction_sweep: true` in `attack_module_config.yaml`, then use the malicious-fraction sweep to compare 0%, 5%, 10%, and 20% malicious clients.
 
@@ -216,7 +230,7 @@ Discussion questions:
 * How does `global_target_label_asr` change?
 * Does surrogate poison success alone prove the final global model learned target-label behavior?
 
-### Experiment 4: Attack budget
+### Experiment 5: Attack budget
 
 Change epsilon from 4/255 to 8/255, keeping the rest of the setup fixed.
 
@@ -226,7 +240,7 @@ Discussion questions:
 * Does transfer success rise with epsilon?
 * At what point might perturbations become too visible or unrealistic for the workshop threat model?
 
-### Experiment 5: Algorithm comparison
+### Experiment 6: Algorithm comparison
 
 Set `attack_module.run_algorithm_comparison: true` and keep `attack_module.algorithm_comparison_attack_recipe` fixed, then compare the configured algorithms.
 
@@ -240,7 +254,7 @@ Discussion questions:
 
 ## Expected artifacts
 
-After a default notebook run, inspect these files in `4_Adversarial_FL/artifacts/`. The malicious-fraction sweep and algorithm-comparison artifacts are written only when their optional modes are enabled.
+After a default notebook run, inspect these files in `4_Adversarial_FL/artifacts/`. The attack-recipe sweep, malicious-fraction sweep, and algorithm-comparison artifacts are written only when their optional modes are enabled.
 
 | Artifact | Purpose |
 | --- | --- |
@@ -263,6 +277,8 @@ After a default notebook run, inspect these files in `4_Adversarial_FL/artifacts
 | `attack_accuracy.png` | Clean vs attacked selected-algorithm accuracy curve with attack-start marker |
 | `global_target_label_asr.png` | Clean vs attacked selected-algorithm target-label ASR curve with attack-start marker |
 | `module4_fast_validation.json` | Optional SyntheticSmoke wiring check for all supported algorithms |
+| `module4_attack_recipe_sweep.json` | Optional attack-recipe sweep payload with full clean/attacked results and a compact summary table |
+| `attack_recipe_sweep.png` | Optional final clean accuracy, attacked accuracy, global target-label ASR, and surrogate poison success by poisoning recipe |
 | `module4_fraction_sweep.json` | Optional malicious-fraction sweep table with global attacked accuracy, `global_target_label_asr`, poisoned examples, and surrogate poison success rate |
 | `malicious_fraction_sweep.png` | Optional global attacked accuracy, global target-label ASR, and surrogate poison success rate versus malicious-client fraction |
 | `module4_algorithm_comparison.json` | Optional algorithm-comparison payload with full clean/attacked results and a compact summary table |

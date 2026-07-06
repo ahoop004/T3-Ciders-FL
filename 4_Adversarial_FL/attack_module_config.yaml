@@ -35,6 +35,8 @@ artifacts:
   federated_attack_metrics: "module4_federated_attacks.json"
   federated_attack_plot: "attack_accuracy.png"
   federated_attack_asr_plot: "global_target_label_asr.png"
+  attack_recipe_sweep_metrics: "module4_attack_recipe_sweep.json"
+  attack_recipe_sweep_plot: "attack_recipe_sweep.png"
   fraction_sweep_metrics: "module4_fraction_sweep.json"
   fraction_sweep_plot: "malicious_fraction_sweep.png"
   algorithm_comparison_metrics: "module4_algorithm_comparison.json"
@@ -50,6 +52,11 @@ attack_module:
   run_surrogate_attacks: true
   run_transfer_attacks: true
   run_federated_poisoning: true
+  # Options: true or false. Runs clean once and attacked FL for each recipe below.
+  run_attack_recipe_sweep: false
+  # Used only when run_attack_recipe_sweep is true.
+  # Options: "random_noise", "fgsm_default", "pgd_default".
+  attack_recipe_sweep_recipes: ["random_noise", "fgsm_default", "pgd_default"]
   # Options: true or false. The sweep reruns several selected-algorithm FL jobs and is slow.
   run_malicious_fraction_sweep: false
   # Options: true or false. Runs a tiny SyntheticSmoke wiring check for all algorithms.
