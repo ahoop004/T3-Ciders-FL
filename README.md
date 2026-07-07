@@ -41,10 +41,15 @@ jupyter notebook 2_IID_Concepts/Non_iid.ipynb
 jupyter notebook 3_Algorithms/Algorithms.ipynb
 
 # Module 4
-jupyter notebook 4_Adversarial_FL/Adv_FL.ipynb
+jupyter notebook 4_Adversarial_FL/train_v3.ipynb
+jupyter notebook 4_Adversarial_FL/train_surrogate.ipynb
+jupyter notebook 4_Adversarial_FL/clean_baselines.ipynb
+jupyter notebook 4_Adversarial_FL/pgd_attack.ipynb
 
 # Module 5
-jupyter notebook 5_Defensive_FL/Defensive_FL.ipynb
+jupyter notebook 5_Defensive_FL/fedavg_baselines.ipynb
+jupyter notebook 5_Defensive_FL/clipping_defense.ipynb
+jupyter notebook 5_Defensive_FL/defense_sweeps.ipynb
 
 ```
 ---
@@ -98,7 +103,7 @@ Model black-box adversaries using surrogate models and standard attacks.
 - Random noise, FGSM, PGD
 - Compare clean accuracy, robust accuracy, transfer success, and malicious-client poisoning across the selected supported FL algorithm
 
-Notebook: `4_Adversarial_FL/Adv_FL.ipynb`
+Notebook path: `train_v3.ipynb` -> `train_surrogate.ipynb` -> `clean_baselines.ipynb` -> one focused attack notebook such as `pgd_attack.ipynb`
 
 ### Module 5 — Defensive Federated Learning
 Defend against the Module 4 malicious-client path with robust aggregation.
@@ -106,7 +111,7 @@ Defend against the Module 4 malicious-client path with robust aggregation.
 - Compare clean accuracy, attacked accuracy, defense recovery, surrogate poison success, and `global_target_label_asr`
 - Stress defenses under malicious-fraction and non-IID sweeps
 
-Notebook: `5_Defensive_FL/Defensive_FL.ipynb`
+Notebook path: `fedavg_baselines.ipynb` -> one or more `*_defense.ipynb` notebooks -> optional `defense_sweeps.ipynb`
 
 ---
 
@@ -141,8 +146,9 @@ Recommended:
 ## Configuration Notes
 
 - Modules 1–2: most hyperparameters are defined directly in the notebook cells.
-- Modules 3 and 5: use `config.yaml` in the module directory for experiment settings.
-- Module 4 split workflow: use `train_v3_config.yaml`, `train_surrogate_config.yaml`, and `attack_module_config.yaml` next to the staged notebooks. The complete `Adv_FL.ipynb` still uses `config.yaml`.
+- Module 3: use `config.yaml` in the module directory for experiment settings.
+- Module 4 staged target/surrogate notebooks use YAML configs; the focused attack notebooks use visible `CONFIG` cells.
+- Module 5 focused notebooks use visible `CONFIG` cells; legacy YAML configs remain for reference.
 
 If a module directory includes its own README, follow that module’s README first.
 

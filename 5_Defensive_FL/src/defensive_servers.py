@@ -19,7 +19,8 @@ from typing import Any, Sequence, Type
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+MODULE_DIR = os.path.dirname(SRC_DIR)
 REPO_ROOT = os.path.dirname(MODULE_DIR)
 MODULE4_DIR = os.path.join(REPO_ROOT, "4_Adversarial_FL")
 MODULE4_SRC_DIR = os.path.join(MODULE4_DIR, "src")
@@ -29,7 +30,10 @@ for path in (REPO_ROOT, MODULE4_DIR, MODULE4_SRC_DIR):
         sys.path.insert(0, path)
 
 from algos import Server as AdversarialServer  # noqa: E402
-from defenses import aggregate_client_updates, summarize_client_updates  # noqa: E402
+if __package__:
+    from .defenses import aggregate_client_updates, summarize_client_updates  # noqa: E402
+else:
+    from defenses import aggregate_client_updates, summarize_client_updates  # noqa: E402
 from util_functions import (  # noqa: E402
     IMAGENET_MEAN,
     IMAGENET_STD,

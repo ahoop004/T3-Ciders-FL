@@ -68,9 +68,9 @@ A successful learner should also be able to describe the core evaluation logic:
 
 ### 1. Setup and configuration check
 
-Start by opening `5_Defensive_FL/Defensive_FL.ipynb` and running the setup cell. The setup should:
+Start by opening `5_Defensive_FL/fedavg_baselines.ipynb` and reviewing the visible `CONFIG` cell. The setup should:
 
-* load `5_Defensive_FL/config.yaml`,
+* resolve the visible notebook `CONFIG`,
 * create `5_Defensive_FL/artifacts/`,
 * import the Module 4 attack-aware client path,
 * validate Module 5 defense assumptions,
@@ -102,8 +102,8 @@ What to inspect:
 
 * `module5_clean_fedavg.json`,
 * per-round clean accuracy,
-* the clean FedAvg row in `module5_defense_comparison.csv`,
-* final accuracy in the comparison table.
+* the clean FedAvg row in each selected `*_defense.ipynb` comparison table,
+* final accuracy in the selected defense notebook's table.
 
 Teaching point:
 
@@ -189,14 +189,13 @@ The code also implements:
 
 What to inspect:
 
-* `module5_defense_comparison.json`,
-* `module5_defense_comparison.csv`,
-* `module5_accuracy_curves.png`,
-* `module5_surrogate_poison_success_curves.png`,
-* `module5_global_target_label_asr_curves.png`,
-* `module5_accuracy_vs_defense.png`,
-* `module5_surrogate_poison_success_vs_defense.png`,
-* `module5_global_target_label_asr_vs_defense.png`.
+* `module5_<defense>.json`,
+* `module5_<defense>_accuracy_curves.png`,
+* `module5_<defense>_surrogate_poison_success_curves.png`,
+* `module5_<defense>_global_target_label_asr_curves.png`,
+* `module5_<defense>_accuracy_vs_baselines.png`,
+* `module5_<defense>_surrogate_poison_success_vs_baselines.png`,
+* `module5_<defense>_global_target_label_asr_vs_baselines.png`.
 
 Teaching point:
 
@@ -475,43 +474,33 @@ Before a live workshop, verify the environment with the cheapest checks.
 
 Recommended checks:
 
-```bash
-python -m py_compile 5_Defensive_FL/*.py
-python -m pytest tests/test_module5_defenses.py
-```
-
-If you want a training smoke check, use the `run_modes.smoke` settings in `5_Defensive_FL/config.yaml` as a temporary instructor-only override. That path uses `SyntheticSmoke`, CPU, 4 clients, 2 rounds, and a small defense list. Keep smoke artifacts separate or delete them after the check.
+* Open `fedavg_baselines.ipynb` and confirm the visible `CONFIG` cell points at the intended Module 4 handoff artifacts.
+* Open the `*_defense.ipynb` notebook you plan to teach first, such as `clipping_defense.ipynb`, and confirm its visible `DEFENSE_CONFIG`.
+* Open `defense_sweeps.ipynb` and confirm the expensive sweep toggles are off unless you plan to run them live.
 
 Teaching note:
 
-> The notebook's visible `RUN_MODE` controls workload (`minimal_demo`, `full_sweeps`, or `load_existing`). The `run_modes.smoke` config block is for instructor preflight, not the default student path unless you deliberately apply those overrides.
+> The focused notebooks keep workload decisions in visible `CONFIG` cells. `defense_sweeps.ipynb` owns the long-running stress tests, so leave those toggles off for the default student path.
 
 ### Step 2: Workshop comparison
 
 For students, use:
 
-```python
-RUN_MODE = "minimal_demo"
-```
+1. `fedavg_baselines.ipynb`
+2. One or more fixed-defense notebooks, such as `clipping_defense.ipynb`, `median_defense.ipynb`, or `krum_defense.ipynb`
 
 This runs:
 
 * clean FedAvg,
 * attacked FedAvg,
 * update diagnostics,
-* fixed defense comparison,
+* one fixed defense comparison per selected `*_defense.ipynb`,
 * plots,
 * artifact validation.
 
 ### Step 3: Full sweeps as optional/HPC runs
 
-Use:
-
-```python
-RUN_MODE = "full_sweeps"
-```
-
-only when there is enough time and compute. Full sweeps can be useful for instructor demos, saved result review, or assignments, but they should not be required for the first live pass.
+Use `defense_sweeps.ipynb` only when there is enough time and compute. Full sweeps can be useful for instructor demos, saved result review, or assignments, but they should not be required for the first live pass.
 
 ---
 
@@ -647,14 +636,13 @@ Use these points repeatedly:
 Likely causes:
 
 * the notebook stopped before the save cell,
-* `RUN_MODE = "load_existing"` was used without existing artifacts,
 * a sweep flag was `False`, so optional sweep artifacts were not expected,
 * the notebook was run from an unexpected working directory,
-* artifact validation is checking files from a different run mode.
+* artifact validation is checking files from a different focused notebook stage.
 
 Teaching response:
 
-> First confirm `RUN_MODE`, then check whether the section that creates the artifact actually ran. The final validation cell expects only the artifacts for the selected path.
+> First confirm which focused notebook created the artifact, then check whether the section that creates it actually ran. The final validation cell expects only the artifacts for the selected stage.
 
 ---
 
@@ -705,7 +693,7 @@ Fix options:
 
 Likely causes:
 
-* running `RUN_MODE = "full_sweeps"`,
+* running `defense_sweeps.ipynb` with one or more long sweep toggles enabled,
 * using CPU,
 * high number of rounds or local epochs,
 * pretrained model downloads or dataset setup,
@@ -713,7 +701,7 @@ Likely causes:
 
 Teaching response:
 
-> Use smoke checks before class, `RUN_MODE = "minimal_demo"` for students, and saved HPC outputs for full-sweep discussion.
+> Use `fedavg_baselines.ipynb` plus selected `*_defense.ipynb` notebooks for students, and saved HPC outputs for full-sweep discussion.
 
 Do not run full sweeps by default in a live class unless the session has enough time and GPU resources.
 
@@ -742,11 +730,11 @@ Likely causes:
 * `experiments.defenses` is empty,
 * every configured defense is infeasible,
 * artifacts were loaded from a different directory,
-* `load_existing` was used before any run had saved results.
+* a `*_defense.ipynb` notebook was run before `fedavg_baselines.ipynb` saved results.
 
 Teaching response:
 
-> Check `module5_config_used.json`, confirm `experiments.defenses`, and confirm that `module5_<run>.json` files exist for the runs being compared.
+> Check the stage config snapshot, confirm `experiments.defenses`, and confirm that `module5_<run>.json` files exist for the runs being compared.
 
 ---
 
@@ -1051,12 +1039,11 @@ Suggested final prompt:
 
 Before teaching Module 5:
 
-* [ ] Run `python -m py_compile 5_Defensive_FL/*.py`.
-* [ ] Run `python -m pytest tests/test_module5_defenses.py` if test dependencies are available.
-* [ ] Open `5_Defensive_FL/Defensive_FL.ipynb` and confirm `RUN_MODE = "minimal_demo"` for students.
-* [ ] Confirm `5_Defensive_FL/config.yaml` validates with `validate_module5_config`.
+* [ ] Open `5_Defensive_FL/fedavg_baselines.ipynb` and confirm the visible `CONFIG` cell is ready for students.
+* [ ] Open the selected `5_Defensive_FL/*_defense.ipynb` notebooks and confirm each visible `DEFENSE_CONFIG` is ready for students.
+* [ ] Open `5_Defensive_FL/defense_sweeps.ipynb` and confirm long sweep toggles are off unless needed.
 * [ ] Confirm the sampled-client count and default Krum `byzantine_f` are feasible.
-* [ ] Decide whether to use live training, saved artifacts, or `load_existing`.
+* [ ] Decide whether to use live training or saved artifacts.
 * [ ] Prepare a short explanation of why `surrogate_poison_success_rate` is not `global_target_label_asr`.
 * [ ] Prepare one example where clipping helps and one where it can hurt.
 * [ ] Prepare one example where non-IID data makes honest clients look suspicious.

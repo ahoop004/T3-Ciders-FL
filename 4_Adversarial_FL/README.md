@@ -4,7 +4,6 @@
 
 **Teaching:** 25-45 min  
 **Exercises:** 30-60 min  
-**Notebook:** `4_Adversarial_FL/Adv_FL.ipynb`  
 **Split notebooks:** `train_v3.ipynb` → `train_surrogate.ipynb` → `attack_module.ipynb`  
 **Focused attack notebooks:** `clean_baselines.ipynb`, `noise_attack.ipynb`, `fgsm_attack.ipynb`, `pgd_attack.ipynb`  
 **Where to run:** ODU HPC (Wahab via Open OnDemand)
@@ -102,7 +101,7 @@ FedOpt-style malicious clients poison local minibatches and then report `delta_y
 
 ## Relation to the notebooks
 
-`Adv_FL.ipynb` remains the complete top-to-bottom version. The same workflow is also available as three staged notebooks:
+The staged workflow is available as three notebooks:
 
 1. `train_v3.ipynb` trains the clean centralized MobileNetV3 target and writes the target metrics/checkpoint.
 2. `train_surrogate.ipynb` trains the MobileNetV2 surrogate and writes the surrogate metrics/checkpoint.
@@ -117,9 +116,9 @@ For a simpler workshop path, run `train_v3.ipynb`, run `train_surrogate.ipynb`, 
 
 Each focused notebook keeps its settings in one config cell instead of a YAML file. The attack notebooks are intentionally direct: load clean-baseline artifact, basic attacked FedAvg with poisoning counters, attack-parameter sweep, algorithm sweep, then a final plot-and-samples cell.
 
-Across the complete or split path, students will:
+Across the staged or focused path, students will:
 
-1. Validate the relevant config and save a stage-specific config snapshot. The split path writes `module4_target_config_used.json`, `module4_surrogate_config_used.json`, and `module4_attack_config_used.json`; the complete notebook uses `config.yaml` and still writes `module4_config_used.json`.
+1. Validate the relevant config and save a stage-specific config snapshot. The staged path writes `module4_target_config_used.json`, `module4_surrogate_config_used.json`, and `module4_attack_config_used.json`.
 2. Prepare a clean MobileNetV3 target checkpoint.
 3. Train and sanity-check a MobileNetV2 surrogate.
 4. Compare random noise, FGSM, and PGD on the surrogate.
@@ -136,7 +135,7 @@ The notebooks are intended to be run top-to-bottom. The clean target checkpoint 
 
 ## Configuration notes
 
-The original split notebooks each load a stage-specific config in `4_Adversarial_FL/`.
+The staged target, surrogate, and attack notebooks each load a stage-specific config in `4_Adversarial_FL/`.
 
 | Config | Used by | Main settings |
 | --- | --- | --- |
@@ -144,7 +143,7 @@ The original split notebooks each load a stage-specific config in `4_Adversarial
 | `train_surrogate_config.yaml` | `train_surrogate.ipynb` | `data_config`, `global_config`, surrogate artifacts, `model_config`, and `surrogate_training` |
 | `attack_module_config.yaml` | `attack_module.ipynb` | `data_config`, `global_config`, attack artifacts, `surrogate_training`, selected algorithm settings, `attack_module`, and `attack` |
 
-The complete `Adv_FL.ipynb` remains compatible with the legacy `config.yaml`. The focused `clean_baselines.ipynb`, `noise_attack.ipynb`, `fgsm_attack.ipynb`, and `pgd_attack.ipynb` notebooks do not use YAML configs; edit the visible `CONFIG` cell in each notebook.
+The focused `clean_baselines.ipynb`, `noise_attack.ipynb`, `fgsm_attack.ipynb`, and `pgd_attack.ipynb` notebooks do not use YAML configs; edit the visible `CONFIG` cell in each notebook.
 
 Key split-workflow controls:
 

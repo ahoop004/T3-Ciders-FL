@@ -9,9 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-import yaml
-
-MODULE_DIR = Path(__file__).resolve().parent
+SRC_DIR = Path(__file__).resolve().parent
+MODULE_DIR = SRC_DIR.parent
 REPO_ROOT = MODULE_DIR.parent
 MODULE4_DIR = REPO_ROOT / "4_Adversarial_FL"
 MODULE4_SRC_DIR = MODULE4_DIR / "src"
@@ -21,22 +20,32 @@ for path in (REPO_ROOT, MODULE4_DIR, MODULE4_SRC_DIR, MODULE_DIR):
     if path_str not in sys.path:
         sys.path.insert(0, path_str)
 
-from defensive_servers import (  # noqa: E402
-    make_attack_config,
-    run_defensive_fl,
-    sampled_client_count,
-    validate_defense_config,
-    validate_module5_config,
-)
-from metrics import build_comparison_rows, save_csv, save_json, update_norm_rows  # noqa: E402
-from plots import (  # noqa: E402
-    plot_accuracy_curves,
-    plot_defense_comparison,
-    plot_global_target_label_asr_curves,
-    plot_sweep_metric,
-    plot_surrogate_poison_success_curves,
-    plot_update_norm_histogram,
-)
+if __package__:
+    from .defensive_servers import (  # noqa: E402
+        make_attack_config,
+        run_defensive_fl,
+        sampled_client_count,
+        validate_defense_config,
+        validate_module5_config,
+    )
+    from .metrics import build_comparison_rows, save_json, update_norm_rows  # noqa: E402
+    from .plots import (  # noqa: E402
+        plot_sweep_metric,
+        plot_update_norm_histogram,
+    )
+else:
+    from defensive_servers import (  # noqa: E402
+        make_attack_config,
+        run_defensive_fl,
+        sampled_client_count,
+        validate_defense_config,
+        validate_module5_config,
+    )
+    from metrics import build_comparison_rows, save_json, update_norm_rows  # noqa: E402
+    from plots import (  # noqa: E402
+        plot_sweep_metric,
+        plot_update_norm_histogram,
+    )
 
 COMPLETED_STATUS = "completed"
 SKIPPED_STATUS = "skipped_infeasible"
@@ -59,7 +68,8 @@ class Module5Context:
     """Resolved config and paths for one split Module 5 notebook."""
 
     config: dict[str, Any]
-    config_path: Path
+    config_path: Path | None
+    config_source: str
     artifact_dir: Path
     stage_name: str
     global_config: dict[str, Any]
@@ -162,23 +172,23 @@ def _resolve_handoff_file(value: str | Path, artifacts_dir: Path) -> Path:
     return (MODULE_DIR / path).resolve()
 
 
-def load_context(
-    config_name: str | Path,
+def prepare_context(
+    config: Mapping[str, Any],
     *,
     stage_name: str | None = None,
     require_attack: bool = True,
+    config_source: str = "notebook cell",
+    config_path: str | Path | None = None,
 ) -> Module5Context:
-    """Load one split-notebook config and resolve shared settings."""
+    """Resolve a Module 5 config dictionary for one split notebook.
 
-    config_path = Path(config_name)
-    if not config_path.is_absolute():
-        config_path = MODULE_DIR / config_path
-    with config_path.open("r", encoding="utf-8") as handle:
-        config = yaml.safe_load(handle)
+    The focused Module 5 notebooks keep their settings in a visible
+    ``CONFIG`` cell and call this helper directly.
+    """
 
     fed_config = _resolve_fed_config(config)
     optim_config = _resolve_optim_config(config)
-    normalized = deepcopy(config)
+    normalized = deepcopy(dict(config))
     normalized["fed_config"] = fed_config
     normalized["optim_config"] = optim_config
     normalized, initial_checkpoint = prepare_module4_handoff(normalized)
@@ -195,7 +205,8 @@ def load_context(
 
     context = Module5Context(
         config=normalized,
-        config_path=config_path,
+        config_path=None if config_path is None else Path(config_path),
+        config_source=config_source,
         artifact_dir=artifact_dir,
         stage_name=stage_name or str(normalized.get("stage", {}).get("name", "module5")),
         global_config=normalized["global_config"],
@@ -207,8 +218,9 @@ def load_context(
         module4_handoff=normalized.get("module4_handoff", {"enabled": False}),
         initial_checkpoint=initial_checkpoint,
     )
+    source_label = context.config_path.name if context.config_path else context.config_source
     print(
-        f"Loaded {context.config_path.name}: stage={context.stage_name}, "
+        f"Loaded {source_label}: stage={context.stage_name}, "
         f"rounds={context.expected_rounds}, sampled_clients={context.sampled_clients}, "
         f"eval_subset={context.data_config.get('eval_subset', 'all')}."
     )
@@ -226,15 +238,18 @@ def record_config_snapshot(
     snapshot_name = artifact_cfg.get("config_snapshot", "module5_config_used.json")
     snapshot = {
         "stage": context.stage_name,
-        "config_path": str(context.config_path),
+        "config_source": context.config_source,
         "expected_rounds": context.expected_rounds,
         "sampled_clients": context.sampled_clients,
         "data_config": context.data_config,
         "fed_config": context.fed_config,
+        "defense": context.config.get("defense", {}),
         "attack": context.base_attack_config,
         "module4_handoff": context.module4_handoff,
         "experiments": context.config.get("experiments", {}),
     }
+    if context.config_path is not None:
+        snapshot["config_path"] = str(context.config_path)
     if extra:
         snapshot.update(dict(extra))
     return save_json(snapshot, context.artifact_path(snapshot_name))
@@ -469,98 +484,6 @@ def load_required_baselines(context: Module5Context) -> dict[str, dict[str, Any]
     return {name: result for name, result in run_results.items() if result is not None}
 
 
-def run_defense_comparison(
-    context: Module5Context,
-    *,
-    run_results: dict[str, dict[str, Any]] | None = None,
-) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
-    run_results = dict(run_results or {})
-    skipped_rows: list[dict[str, Any]] = []
-    defenses = context.config.get("experiments", {}).get("defenses", [])
-
-    for defense_config in defenses:
-        name = defense_config["name"]
-        if name == "fedavg" and "attacked_fedavg" in run_results:
-            continue
-
-        issues = defense_infeasibility_issues(
-            context,
-            defense_config,
-            context_label=f"defense comparison {name}",
-        )
-        if issues:
-            skipped_rows.append(
-                make_skipped_row(context, name, defense_config, issues)
-            )
-            continue
-        run_results[name] = run_module5_experiment(
-            context,
-            name,
-            context.base_attack_config,
-            defense_config,
-        )
-
-    comparison_rows = build_comparison_rows(run_results)
-    for row in comparison_rows:
-        row.setdefault("status", COMPLETED_STATUS)
-    comparison_rows.extend(skipped_rows)
-
-    _validate_defense_rows_recorded(defenses, comparison_rows, run_results)
-    save_comparison_outputs(context, run_results, comparison_rows)
-    return run_results, comparison_rows
-
-
-def save_comparison_outputs(
-    context: Module5Context,
-    run_results: Mapping[str, Mapping[str, Any]],
-    comparison_rows: Sequence[Mapping[str, Any]],
-) -> None:
-    save_json(comparison_rows, context.artifact_path("module5_defense_comparison.json"))
-    save_csv(comparison_rows, context.artifact_path("module5_defense_comparison.csv"))
-
-    plot_rows = completed_rows(comparison_rows)
-    if not plot_rows:
-        print("No completed comparison rows available for plotting.")
-        return
-
-    plot_accuracy_curves(
-        run_results,
-        context.artifact_path("module5_accuracy_curves.png"),
-        attack_start_round=context.base_attack_config["start_round"],
-    )
-    plot_surrogate_poison_success_curves(
-        run_results,
-        context.artifact_path("module5_surrogate_poison_success_curves.png"),
-        attack_start_round=context.base_attack_config["start_round"],
-    )
-    plot_global_target_label_asr_curves(
-        run_results,
-        context.artifact_path("module5_global_target_label_asr_curves.png"),
-        attack_start_round=context.base_attack_config["start_round"],
-    )
-    plot_defense_comparison(
-        plot_rows,
-        metric="final_accuracy",
-        path=context.artifact_path("module5_accuracy_vs_defense.png"),
-        ylabel="Final accuracy (%)",
-        title="Final accuracy by defense",
-    )
-    plot_defense_comparison(
-        plot_rows,
-        metric="final_surrogate_poison_success_rate",
-        path=context.artifact_path("module5_surrogate_poison_success_vs_defense.png"),
-        ylabel="Final surrogate poison success rate (%)",
-        title="Final surrogate poison success rate by defense",
-    )
-    plot_defense_comparison(
-        plot_rows,
-        metric="final_global_target_label_asr",
-        path=context.artifact_path("module5_global_target_label_asr_vs_defense.png"),
-        ylabel="Final global target-label ASR (%)",
-        title="Final global target-label ASR by defense",
-    )
-
-
 def run_malicious_fraction_sweep(context: Module5Context) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     experiments = context.config.get("experiments", {})
@@ -761,26 +684,6 @@ def _resolve_optim_config(config: Mapping[str, Any]) -> dict[str, Any]:
     return deepcopy(fedavg.get("optim_config", {}))
 
 
-def _validate_defense_rows_recorded(
-    defenses: Sequence[Mapping[str, Any]],
-    comparison_rows: Sequence[Mapping[str, Any]],
-    run_results: Mapping[str, Mapping[str, Any]],
-) -> None:
-    expected_runs = [
-        "attacked_fedavg"
-        if defense["name"] == "fedavg" and "attacked_fedavg" in run_results
-        else defense["name"]
-        for defense in defenses
-    ]
-    seen_runs = {row.get("run") for row in comparison_rows}
-    missing_runs = [run_name for run_name in expected_runs if run_name not in seen_runs]
-    if missing_runs:
-        raise AssertionError(
-            "Defense comparison did not record every configured defense: "
-            f"{missing_runs}"
-        )
-
-
 __all__ = [
     "COMPLETED_STATUS",
     "MODULE_DIR",
@@ -790,22 +693,20 @@ __all__ = [
     "SKIPPED_STATUS",
     "completed_rows",
     "defense_infeasibility_issues",
-    "load_context",
     "load_json_if_present",
     "load_required_baselines",
     "load_run_result",
     "make_attack_config",
     "make_skipped_row",
     "prepare_module4_handoff",
+    "prepare_context",
     "record_config_snapshot",
-    "run_defense_comparison",
     "run_fedavg_baselines",
     "run_krum_hyperparameter_sweep",
     "run_malicious_fraction_sweep",
     "run_module5_experiment",
     "run_non_iid_stress",
     "run_result_path",
-    "save_comparison_outputs",
     "save_update_diagnostics",
     "validate_artifacts",
     "validate_result",

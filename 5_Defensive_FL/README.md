@@ -4,7 +4,7 @@
 
 - **Teaching:** 25-45 min
 - **Exercises:** 30-60 min
-- **Notebook:** `5_Defensive_FL/Defensive_FL.ipynb`
+- **Student path:** `fedavg_baselines.ipynb` -> one or more `*_defense.ipynb` notebooks -> optional `defense_sweeps.ipynb`
 - **Where to run:** ODU HPC / Wahab via Open OnDemand
 
 Module 5 studies defensive aggregation under malicious federated clients.
@@ -25,47 +25,55 @@ defense trades off clean accuracy, attacked accuracy, surrogate poison success,
 
 | File | Purpose |
 | --- | --- |
-| `Defensive_FL.ipynb` | Student-facing lab |
-| `config.yaml` | Dataset, attack recipe, defense settings, and sweeps |
-| `defenses.py` | Aggregation rules: FedAvg, clipping, median, trimmed mean, Krum, Multi-Krum, geometric median |
-| `defensive_servers.py` | Module 4 attack-aware server subclasses with robust aggregation |
-| `metrics.py` | Accuracy drop, `global_target_label_asr` reduction, surrogate poison success, comparison tables, JSON/CSV writers |
-| `plots.py` | Accuracy, `global_target_label_asr`, surrogate poison success, update norm, and sweep plots |
+| `fedavg_baselines.ipynb` | Focused student lab for clean and attacked FedAvg handoff artifacts |
+| `clipping_defense.ipynb` | Norm-clipping defense run with its own visible config cell |
+| `median_defense.ipynb` | Coordinate-wise median defense run with its own visible config cell |
+| `trimmed_mean_defense.ipynb` | Trimmed-mean defense run with its own visible config cell |
+| `krum_defense.ipynb` | Krum defense run with its own visible config cell |
+| `multi_krum_defense.ipynb` | Multi-Krum defense run with its own visible config cell |
+| `geometric_median_defense.ipynb` | Geometric-median / RFA defense run with its own visible config cell |
+| `defense_sweeps.ipynb` | Optional longer sweep lab with visible toggles and grids |
+| `src/defenses.py` | Aggregation rules: FedAvg, clipping, median, trimmed mean, Krum, Multi-Krum, geometric median |
+| `src/defensive_servers.py` | Module 4 attack-aware server subclasses with robust aggregation |
+| `src/federated_core.py` | Module 5 re-export of shared federated base classes |
+| `src/metrics.py` | Accuracy drop, `global_target_label_asr` reduction, surrogate poison success, comparison tables, JSON/CSV writers |
+| `src/notebook_utils.py` | Shared helpers for the focused notebooks |
+| `src/plots.py` | Accuracy, `global_target_label_asr`, surrogate poison success, update norm, and sweep plots |
 | `artifacts/` | Saved metrics and figures |
 
-## Run modes
+## Focused notebook path
 
-`Defensive_FL.ipynb` is designed to run top-to-bottom. Open the notebook and
-start with the default student path:
-
-```python
-RUN_MODE = "minimal_demo"
-```
-
-| Run mode | What runs | Use case |
-| --- | --- | --- |
-| `minimal_demo` | Clean FedAvg, attacked FedAvg, defense comparison, plots, and validation cells | Default lab path |
-| `full_sweeps` | Minimal demo plus malicious-fraction, Krum, and non-IID sweeps | Longer workshop or instructor demo |
-| `load_existing` | Loads saved artifacts when present and skips training | Result review without rerunning experiments |
-
-Longer sections also expose section-level flags such as
-`RUN_MALICIOUS_FRACTION_SWEEP`, `RUN_KRUM_HYPERPARAMETER_SWEEP`, and
-`RUN_NON_IID_STRESS`. Keep them `False` for the first student run unless the
-class has enough compute and time.
-
-The notebook includes validation cells that check the config was loaded,
-required metrics were logged for the expected number of FL rounds, every
-configured defense was recorded in the comparison, and expected artifacts were
-saved for the selected run mode.
-
-## Lightweight tests
-
-The robust aggregation helpers can be checked without Imagenette, CUDA,
-Jupyter, or internet access:
+Run the focused notebooks in order:
 
 ```bash
-python -m pytest tests/test_module5_defenses.py
+jupyter notebook 5_Defensive_FL/fedavg_baselines.ipynb
+jupyter notebook 5_Defensive_FL/clipping_defense.ipynb
+jupyter notebook 5_Defensive_FL/median_defense.ipynb
+jupyter notebook 5_Defensive_FL/trimmed_mean_defense.ipynb
+jupyter notebook 5_Defensive_FL/krum_defense.ipynb
+jupyter notebook 5_Defensive_FL/multi_krum_defense.ipynb
+jupyter notebook 5_Defensive_FL/geometric_median_defense.ipynb
+jupyter notebook 5_Defensive_FL/defense_sweeps.ipynb
 ```
+
+| Notebook | What runs | Use case |
+| --- | --- | --- |
+| `fedavg_baselines.ipynb` | Clean FedAvg, attacked FedAvg, update diagnostics, and update-norm plot | Required first step |
+| `clipping_defense.ipynb` | One attacked norm-clipping defense run compared with saved baselines | Default fixed-defense pattern |
+| `median_defense.ipynb` | One attacked coordinate-median defense run compared with saved baselines | Robust coordinate statistic |
+| `trimmed_mean_defense.ipynb` | One attacked trimmed-mean defense run compared with saved baselines | Robust coordinate statistic |
+| `krum_defense.ipynb` | One attacked Krum defense run compared with saved baselines | Distance-based robust aggregation |
+| `multi_krum_defense.ipynb` | One attacked Multi-Krum defense run compared with saved baselines | Distance-based robust aggregation |
+| `geometric_median_defense.ipynb` | One attacked geometric-median / RFA run compared with saved baselines | Robust-center extension |
+| `defense_sweeps.ipynb` | Malicious-fraction, Krum, and non-IID sweeps | Longer workshop or instructor demo |
+
+Each focused notebook keeps its settings in one visible `CONFIG` cell. Edit
+that cell to change data settings, attack settings, defense settings, artifact
+names, or sweep grids. The individual `*_defense.ipynb` notebooks run one
+defense each. `defense_sweeps.ipynb` keeps expensive sweep toggles off by
+default; turn on only the sweep sections you intend to run.
+
+The focused notebooks are the supported teaching path.
 
 ## Learning objectives
 
@@ -95,21 +103,17 @@ Use these questions to frame the module:
 9. Why is `surrogate_poison_success_rate` not the same as `global_target_label_asr`?
 10. Why can non-IID honest data make robust aggregation harder?
 
-## Relation to the notebook
+## Relation to the notebooks
 
-In `Defensive_FL.ipynb`, students will:
+In the focused notebook path, students will:
 
-1. Load `config.yaml`, resolve paths, create `5_Defensive_FL/artifacts/`, and validate defense assumptions before training.
-2. Run a clean FedAvg baseline and an attacked FedAvg baseline with the Module 4 malicious-client path.
+1. Edit the visible `CONFIG` cell in each notebook and resolve paths, artifacts, and Module 4 handoff settings.
+2. Run clean FedAvg and attacked FedAvg with the Module 4 malicious-client path in `fedavg_baselines.ipynb`.
 3. Inspect update diagnostics from the attacked FedAvg run, including update norms and distance-to-median behavior.
-4. Run every defense listed in `experiments.defenses` under the same attack recipe.
-5. Compare clean accuracy, attacked accuracy, defense recovery, surrogate poison success, and `global_target_label_asr`.
-6. Save comparison tables and plots for accuracy, surrogate poison success, `global_target_label_asr`, and update diagnostics.
-7. Optionally run longer malicious-fraction, Krum-feasibility, and non-IID stress sweeps with `RUN_MODE = "full_sweeps"`.
-8. Use the final validation cell to confirm that the expected artifacts were written for the selected run mode.
-
-The default student path is `RUN_MODE = "minimal_demo"`. It produces useful
-outputs without running the longer sweeps.
+4. Run one or more `*_defense.ipynb` notebooks under the same attack recipe, changing only the visible `DEFENSE_CONFIG`.
+5. Compare clean accuracy, attacked accuracy, defense recovery, surrogate poison success, and `global_target_label_asr` using each notebook's inline tables and plots.
+6. Optionally run longer malicious-fraction, Krum-feasibility, and non-IID stress sweeps in `defense_sweeps.ipynb`.
+7. Use the final handoff/validation cells to confirm that expected artifacts were written.
 
 ## Threat model
 
@@ -283,7 +287,7 @@ credible under malicious-fraction and non-IID stress.
 
 ## Configuration notes
 
-Main settings are in `5_Defensive_FL/config.yaml`.
+Main settings are in the visible `CONFIG` cell of each focused notebook.
 
 | Key | What it controls |
 | --- | --- |
@@ -302,16 +306,17 @@ Main settings are in `5_Defensive_FL/config.yaml`.
 | `experiments.non_iid_sweep` | Longer stress sweep over honest data heterogeneity |
 | `experiments.krum_byzantine_f_sweep` | Krum feasibility and sensitivity sweep |
 
-The default notebook control is `RUN_MODE = "minimal_demo"`. Use
-`RUN_MODE = "full_sweeps"` only when there is enough time and compute for the
-longer sweeps.
+In `defense_sweeps.ipynb`, keep `defense_sweeps.run_malicious_fraction_sweep`,
+`defense_sweeps.run_krum_hyperparameter_sweep`, and
+`defense_sweeps.run_non_iid_stress` set to `False` unless there is enough time
+and compute for the longer sweeps.
 
 ## Suggested experiments
 
 1. Clean defense sanity check with `malicious_fraction = 0.0`.
 2. Attacked FedAvg baseline with the Module 4 attack recipe.
-3. Fixed-attack defense comparison across FedAvg, clipping, median, trimmed
-   mean, and Krum.
+3. Fixed-attack defense comparison across the individual clipping, median,
+   trimmed mean, Krum, Multi-Krum, and geometric-median notebooks.
 4. Malicious fraction sweep over `{0.0, 0.05, 0.1, 0.2, 0.3}`.
 5. Non-IID stress test over `{0.0, 0.5, 0.8}`.
 6. Hyperparameter sweeps for `clip_norm`, `trim_fraction`, and `byzantine_f`.
@@ -320,24 +325,24 @@ longer sweeps.
 
 ## Expected artifacts
 
-The notebook writes artifacts under `5_Defensive_FL/artifacts/`. The final
-validation cell checks the subset expected for the selected `RUN_MODE`.
+The focused notebooks write artifacts under `5_Defensive_FL/artifacts/`. The
+final handoff cells check the artifacts expected from the notebook that was run.
 
 | Artifact | Purpose |
 | --- | --- |
-| `module5_config_used.json` | Run mode, sampled-client count, configured defenses, expected rounds, and attack settings used by the notebook |
+| `module5_baselines_config_used.json` | Effective visible-cell config snapshot for `fedavg_baselines.ipynb` |
+| `module5_<defense>_config_used.json` | Effective visible-cell config snapshot for one `*_defense.ipynb` notebook |
+| `module5_defense_sweeps_config_used.json` | Effective visible-cell config snapshot for `defense_sweeps.ipynb` |
 | `module5_clean_fedavg.json` | Clean FedAvg baseline |
 | `module5_attacked_fedavg.json` | Attacked FedAvg baseline |
 | `module5_<defense>.json` | Per-defense run results for non-FedAvg defenses; FedAvg uses the clean and attacked baseline files |
-| `module5_defense_comparison.json` | Defense comparison metrics |
-| `module5_defense_comparison.csv` | Defense comparison table |
+| `module5_<defense>_accuracy_curves.png` | Per-round accuracy for clean FedAvg, attacked FedAvg, and one defense |
+| `module5_<defense>_surrogate_poison_success_curves.png` | Per-round surrogate poison success for clean FedAvg, attacked FedAvg, and one defense |
+| `module5_<defense>_global_target_label_asr_curves.png` | Per-round `global_target_label_asr` for clean FedAvg, attacked FedAvg, and one defense |
+| `module5_<defense>_accuracy_vs_baselines.png` | Final accuracy for clean FedAvg, attacked FedAvg, and one defense |
+| `module5_<defense>_surrogate_poison_success_vs_baselines.png` | Final surrogate poison success for clean FedAvg, attacked FedAvg, and one defense |
+| `module5_<defense>_global_target_label_asr_vs_baselines.png` | Final `global_target_label_asr` for clean FedAvg, attacked FedAvg, and one defense |
 | `module5_update_diagnostics.json` | Flattened client update diagnostics for the attacked FedAvg run |
-| `module5_accuracy_curves.png` | Per-round accuracy by run |
-| `module5_surrogate_poison_success_curves.png` | Per-round surrogate poison success rate by run |
-| `module5_global_target_label_asr_curves.png` | Per-round `global_target_label_asr` by run |
-| `module5_accuracy_vs_defense.png` | Final accuracy by defense |
-| `module5_surrogate_poison_success_vs_defense.png` | Final surrogate poison success rate by defense |
-| `module5_global_target_label_asr_vs_defense.png` | Final `global_target_label_asr` by defense |
 | `module5_update_norms.png` | Update norm diagnostics |
 | `module5_malicious_fraction_sweep.json` | Malicious-fraction sweep |
 | `module5_malicious_fraction_accuracy.png` | Final accuracy by malicious-client fraction |

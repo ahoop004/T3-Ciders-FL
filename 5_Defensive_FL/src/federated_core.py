@@ -6,10 +6,15 @@ they can reuse Module 4's malicious-client pipeline and override aggregation
 without changing the attack recipe.
 """
 
-import sys
 import os
+import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+MODULE_DIR = os.path.dirname(SRC_DIR)
+REPO_ROOT = os.path.dirname(MODULE_DIR)
+
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
 from common.federated_core import BaseClient, BaseServer, StateDict  # noqa: F401
 
