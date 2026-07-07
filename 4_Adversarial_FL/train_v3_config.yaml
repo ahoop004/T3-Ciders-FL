@@ -30,7 +30,8 @@ artifacts:
 
 target_training:
   notebook: "train_v3.ipynb"
-  # Options: "centralized". Federated target training is handled in attack_module.
+  # Options: "centralized". Federated clean/attacked runs are handled in the
+  # focused attack notebooks.
   mode: "centralized"
   # Options: "quick", "tuned_imagenette", or another key added under target_training_profiles.
   profile: "quick"
@@ -108,8 +109,8 @@ model_config:
     dropout: 0.1
 
 algorithms:
-  # Used only for fallback defaults in train_v3_config.yaml. attack_module_config.yaml
-  # owns the actual clean/attacked FedAvg run settings.
+  # Used only for fallback defaults in train_v3_config.yaml. Focused attack
+  # notebooks own the actual clean/attacked FL run settings.
   FedAvg:
     fed_config:
       num_epochs: 3

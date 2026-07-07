@@ -361,55 +361,42 @@ def test_fast_validation_returns_artifact_shaped_rows(monkeypatch, tmp_path):
         assert row["history_lengths"]["global_target_label_asr"] == 2
 
 
-def test_attack_module_exposes_algorithm_comparison_option():
+def test_focused_attack_notebooks_expose_algorithm_comparison_option():
     import json
-    import yaml
 
-    config_path = MODULE4_DIR / "attack_module_config.yaml"
-    with config_path.open() as f:
-        config = yaml.safe_load(f)
+    clean_notebook = json.loads((MODULE4_DIR / "clean_baselines.ipynb").read_text())
+    clean_source = "\n".join(
+        "".join(cell.get("source", [])) for cell in clean_notebook["cells"]
+    )
+    assert '"clean_baseline_algorithms": ["FedAvg", "FedAdam", "FedAdagrad", "FedYogi", "Scaffold"]' in clean_source
+    assert "module4_clean_baselines.json" in clean_source
+    assert "run_clean_baselines(" in clean_source
 
-    attack_module = config["attack_module"]
-    artifacts = config["artifacts"]
-    assert attack_module["run_attack_recipe_sweep"] is False
-    assert attack_module["attack_recipe_sweep_recipes"] == [
-        "random_noise",
-        "fgsm_default",
-        "pgd_default",
-    ]
-    assert attack_module["run_algorithm_comparison"] is False
-    assert attack_module["algorithm_comparison_attack_recipe"] == "pgd_default"
-    assert set(attack_module["algorithm_comparison_algorithms"]) == {
+    expected_algorithms = {
         "FedAvg",
         "FedAdam",
         "FedAdagrad",
         "FedYogi",
         "Scaffold",
     }
-    assert artifacts["attack_recipe_sweep_metrics"] == "module4_attack_recipe_sweep.json"
-    assert artifacts["attack_recipe_sweep_plot"] == "attack_recipe_sweep.png"
-    assert artifacts["algorithm_comparison_metrics"] == "module4_algorithm_comparison.json"
-    assert artifacts["algorithm_comparison_plot"] == "algorithm_comparison.png"
+    removed_split_notebook = "attack" + "_module.ipynb"
 
-    notebook_path = MODULE4_DIR / "attack_module.ipynb"
-    notebook = json.loads(notebook_path.read_text())
-    notebook_source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    for notebook_name in ("noise_attack.ipynb", "fgsm_attack.ipynb", "pgd_attack.ipynb"):
+        notebook = json.loads((MODULE4_DIR / notebook_name).read_text())
+        notebook_source = "\n".join(
+            "".join(cell.get("source", [])) for cell in notebook["cells"]
+        )
 
-    assert "RUN_ATTACK_RECIPE_SWEEP" in notebook_source
-    assert "run_attack_recipe_sweep(" in notebook_source
-    assert "attack_recipe_sweep_payload = run_attack_recipe_sweep(" not in notebook_source
-    assert "module4_attack_recipe_sweep.json" in notebook_source
-    assert "RUN_ALGORITHM_COMPARISON" in notebook_source
-    assert "run_algorithm_comparison(" in notebook_source
-    assert "build_clean_attacked_summary_row" in notebook_source
-    assert "clean_baseline_for_algorithm" in notebook_source
-    assert "RUN_SELECTED_ALGORITHM_CLEAN_BASELINE" in notebook_source
-    assert 'federated_attack_results["clean"] = clean_baseline_for_algorithm(SELECTED_ALGORITHM)' in notebook_source
-    assert 'federated_attack_results["pgd_default"] = run_attack_recipe_on_server(' in notebook_source
-    assert "Run Random-Noise Sweep Attack" in notebook_source
-    assert "Run FGSM Sweep Attack" in notebook_source
-    assert "Run PGD Sweep Attack" in notebook_source
-    assert '"clean_baseline": _json_safe(clean_baseline)' in notebook_source
+        assert "run_basic_attack(context, \"FedAvg\")" in notebook_source
+        assert "run_attack_parameter_sweep(" in notebook_source
+        assert "run_algorithm_sweep(" in notebook_source
+        assert "module4_clean_baselines.json" in notebook_source
+        assert "make_poisoned_sample_batch(" in notebook_source
+        assert removed_split_notebook not in notebook_source
+        for algorithm in expected_algorithms:
+            assert algorithm in notebook_source
+
+    helper_source = (MODULE4_SRC_DIR / "attack_notebook_utils.py").read_text()
     for field in (
         "final_clean_accuracy",
         "final_attacked_accuracy",
@@ -417,4 +404,4 @@ def test_attack_module_exposes_algorithm_comparison_option():
         "surrogate_poison_success_rate",
         "global_target_label_asr",
     ):
-        assert field in notebook_source
+        assert field in helper_source

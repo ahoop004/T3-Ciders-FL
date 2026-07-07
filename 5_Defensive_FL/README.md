@@ -9,8 +9,8 @@
 
 Module 5 studies defensive aggregation under malicious federated clients.
 Module 4 showed that malicious clients can damage plain FedAvg. This module
-keeps the same malicious-client path and changes only the server aggregation
-rule.
+keeps the same malicious-client path and changes the server-side parameter
+aggregation rule.
 
 Core question:
 
@@ -20,6 +20,10 @@ Core question:
 The main lesson is that robust aggregation can help, but it is not free. Each
 defense trades off clean accuracy, attacked accuracy, surrogate poison success,
 `global_target_label_asr`, runtime, and assumptions about the attacker.
+
+Implementation note: Module 5 applies robust aggregation to parameter deltas.
+Model buffers such as BatchNorm running statistics are averaged across selected
+clients after the parameter update, matching the Module 4 FedAvg handoff behavior.
 
 ## Files
 
@@ -400,8 +404,8 @@ why client data heterogeneity matters, Module 3 compared server optimization
 rules, and Module 4 added adversarial clients and precise attack metrics.
 
 This module asks students to put those pieces together: keep the same clients,
-attack recipe, dataset, and evaluation target, then change only the aggregation
-rule. A good final interpretation should explain which defense helped, what it
+attack recipe, dataset, and evaluation target, then change only the parameter
+aggregation rule. A good final interpretation should explain which defense helped, what it
 cost in clean accuracy or runtime, whether `global_target_label_asr` decreased,
 whether surrogate poison success told the same story, and how the conclusion
 changed under non-IID stress.

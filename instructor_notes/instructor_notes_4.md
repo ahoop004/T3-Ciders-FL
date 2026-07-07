@@ -266,11 +266,11 @@ After learners understand adversarial examples, shift to FL:
 
 Explain the Module 4 scope clearly:
 
-> The notebook's malicious-client poisoning path is wired for FedAvg. It perturbs and relabels selected local examples for malicious clients, then observes how poisoned local training affects the final MobileNetV3 global model.
+> The focused attack notebooks start with a FedAvg malicious-client poisoning run. They perturb and relabel selected local examples for malicious clients, then observe how poisoned local training affects the final MobileNetV3 global model.
 
-Avoid implying broader support:
+Then describe the optional extension accurately:
 
-> FedAdam, FedYogi, FedAdagrad, and SCAFFOLD are important FL algorithms, but this module's malicious-client attack path should be taught as a FedAvg poisoning experiment unless the code has been extended.
+> The algorithm-sweep cells reuse the same surrogate poisoning path for FedAdam, FedYogi, FedAdagrad, and SCAFFOLD. FedOpt malicious clients must return `delta_y`; SCAFFOLD malicious clients must preserve `server_c`, `client_c`, `delta_y`, and `delta_c`.
 
 Ask:
 
@@ -400,7 +400,7 @@ During malicious-client FL, the fraction of poisoned local examples that the mal
 
 ### Global target-label ASR
 
-The final global-model metric for the FedAvg poisoning run. It measures the percentage of held-out non-target test examples that the final MobileNetV3 global model predicts as the configured target label.
+The final global-model metric for malicious-client FL poisoning runs. It measures the percentage of held-out non-target test examples that the final MobileNetV3 global model predicts as the configured target label.
 
 ### Malicious-client poisoning
 
@@ -452,7 +452,7 @@ Use for a short workshop section.
 | 5 min | Random noise vs FGSM vs PGD                               |
 | 6 min | Black-box surrogate attacks: MobileNetV2 -> MobileNetV3   |
 | 6 min | Transfer success vs target-label success                  |
-| 5 min | FedAvg poisoning and global attack metrics                |
+| 5 min | FL poisoning and global attack metrics                    |
 | 3 min | Checkpoint questions and Module 5 bridge                  |
 
 ### 60-minute version
@@ -864,7 +864,7 @@ Have students:
 3. Identify whether PGD reduces robust accuracy more than FGSM.
 4. Inspect MobileNetV2-to-MobileNetV3 transfer results.
 5. Compare transfer success with target-label success.
-6. Run or inspect the malicious-client FedAvg poisoning results.
+6. Run or inspect the basic malicious-client FedAvg poisoning results.
 7. Compare final attacked accuracy with `global_target_label_asr`.
 8. Inspect the malicious-fraction sweep and describe how attack impact changes as the malicious fraction increases.
 
@@ -967,7 +967,7 @@ Before teaching Module 4:
 * [ ] Confirm surrogate training or surrogate checkpoint behavior for the planned teaching session.
 * [ ] Confirm random noise, FGSM, and PGD result tables or plots are available.
 * [ ] Confirm transfer results show MobileNetV2-crafted examples evaluated on MobileNetV3.
-* [ ] Confirm the malicious-client FedAvg poisoning section is the only poisoning path being taught.
+* [ ] Decide whether to teach only the basic FedAvg poisoning path or also show the optional algorithm sweep.
 * [ ] Prepare a short explanation of why surrogate poison success is not `global_target_label_asr`.
 * [ ] Decide whether to use the 15-, 30-, or 60-minute flow.
 * [ ] Prepare one metric-identification checkpoint question.

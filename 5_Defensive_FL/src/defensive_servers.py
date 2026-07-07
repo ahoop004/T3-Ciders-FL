@@ -1,7 +1,7 @@
 """Attack-aware defensive servers for Module 5.
 
 Module 5 reuses Module 4's malicious-client pipeline and changes only the
-server aggregation rule.  The base ``DefensiveServer`` subclasses Module 4's
+server parameter aggregation rule.  The base ``DefensiveServer`` subclasses Module 4's
 ``Server`` so malicious clients, attack schedules, and attack metrics stay
 identical across the two modules.
 """
@@ -229,7 +229,7 @@ class DefensiveServer(AdversarialServer):
         )
 
     def aggregate(self, client_ids: Sequence[int]) -> None:
-        """Aggregate client model deltas with the configured defense."""
+        """Aggregate client parameter deltas with the configured defense."""
         if not client_ids:
             return
 
@@ -247,6 +247,7 @@ class DefensiveServer(AdversarialServer):
                 param.data.add_(
                     update.to(device=param.device, dtype=param.dtype) * self.server_stepsize
                 )
+        buffer_diagnostics = self._copy_averaged_client_buffers(client_ids)
 
         self.last_defense_diagnostics = {
             "round": int(self.current_round + 1),
@@ -254,6 +255,7 @@ class DefensiveServer(AdversarialServer):
             "server_stepsize": float(self.server_stepsize),
             "update_diagnostics": update_diagnostics,
             "aggregation": aggregation.diagnostics,
+            "buffer_aggregation": buffer_diagnostics,
         }
 
         self.x = self.global_model
@@ -280,6 +282,42 @@ class DefensiveServer(AdversarialServer):
             updates.append(local_update)
 
         return updates
+
+    def _copy_averaged_client_buffers(self, client_ids: Sequence[int]) -> dict[str, Any]:
+        """Average client model buffers so BatchNorm state follows Module 4 FedAvg."""
+        target_buffers = dict(self.global_model.named_buffers())
+        if not target_buffers:
+            return {"strategy": "none", "buffer_count": 0}
+
+        buffer_states: list[dict[str, torch.Tensor]] = []
+        for idx in client_ids:
+            local_model = getattr(self.clients[idx], "y", None)
+            if local_model is None:
+                raise RuntimeError(
+                    f"Client {idx} has no local model `y`. Did collect_client_updates run?"
+                )
+            buffer_states.append(
+                {
+                    name: tensor.detach().to(self.device)
+                    for name, tensor in local_model.named_buffers()
+                }
+            )
+
+        if not buffer_states or not buffer_states[0]:
+            return {"strategy": "none", "buffer_count": 0}
+
+        copied = 0
+        with torch.no_grad():
+            for name in buffer_states[0]:
+                if name not in target_buffers:
+                    continue
+                values = [state[name] for state in buffer_states]
+                averaged = _average_buffer_values(values)
+                target = target_buffers[name]
+                target.copy_(averaged.to(device=target.device, dtype=target.dtype))
+                copied += 1
+
+        return {"strategy": "client_buffer_average", "buffer_count": copied}
 
 
 class FedAvgDefenseServer(DefensiveServer):
@@ -334,6 +372,15 @@ SERVER_REGISTRY: dict[str, Type[DefensiveServer]] = {
     "geometric_median": GeometricMedianServer,
     "rfa": GeometricMedianServer,
 }
+
+
+def _average_buffer_values(values: Sequence[torch.Tensor]) -> torch.Tensor:
+    """Average floating buffers and preserve the first non-floating buffer."""
+    values = [value.detach() for value in values]
+    first = values[0]
+    if torch.is_floating_point(first) or torch.is_complex(first):
+        return torch.stack(values, dim=0).mean(dim=0)
+    return first.clone()
 
 
 def _is_synthetic_smoke_dataset(dataset_name: str | None) -> bool:

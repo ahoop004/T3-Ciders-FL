@@ -25,7 +25,7 @@ A modular federated learning (FL) workshop that moves from the FL control loop, 
 git clone https://github.com/ahoop004/T3-Ciders-FL.git
 cd T3-Ciders-FL
 
-pip install torch torchvision matplotlib numpy pyyaml
+pip install torch torchvision matplotlib numpy pandas pyyaml
 ```
 
 Then open the notebook for the module you want to explore, for example:

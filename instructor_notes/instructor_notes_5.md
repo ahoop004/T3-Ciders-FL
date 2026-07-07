@@ -17,7 +17,7 @@ Module 5 is the capstone defensive FL module. It follows Module 4's adversarial 
 The module should help learners understand:
 
 * why plain FedAvg is vulnerable under malicious-client updates,
-* why Module 5 keeps the Module 4 attack recipe fixed and changes only aggregation,
+* why Module 5 keeps the Module 4 attack recipe fixed and changes only parameter aggregation,
 * how robust aggregation differs from ordinary averaging,
 * how clipping, coordinate-wise median, trimmed mean, Krum, Multi-Krum, and geometric median/RFA work at a high level,
 * how to compare clean FedAvg, attacked FedAvg, and defended attacked runs,
@@ -26,7 +26,7 @@ The module should help learners understand:
 * why non-IID honest clients can make defensive aggregation harder,
 * and why no implemented defense should be presented as a universal solution.
 
-Module 5 should not be taught as a new attack module. The attack path comes from Module 4. The instructional goal is defensive comparison: keep the attacker fixed, then ask what each aggregation rule protects, what it costs, and where it fails.
+Module 5 should not be taught as a new attack module. The attack path comes from Module 4. The instructional goal is defensive comparison: keep the attacker fixed, then ask what each parameter aggregation rule protects, what it costs, and where it fails. Model buffers such as BatchNorm running statistics are averaged across selected clients so the FedAvg control remains aligned with Module 4.
 
 ---
 
@@ -56,7 +56,7 @@ Helpful but not required:
 
 By the end of this module, learners should be able to explain:
 
-> FedAvg averages every selected client update, so malicious clients can influence the global model by sending poisoned or harmful updates. Module 5 keeps the Module 4 malicious-client attack fixed and changes only the server aggregation rule. Robust aggregation methods try to reduce malicious influence, but they also make assumptions about update magnitude, coordinate outliers, update distances, client sampling, and how similar honest clients should look.
+> FedAvg averages every selected client update, so malicious clients can influence the global model by sending poisoned or harmful updates. Module 5 keeps the Module 4 malicious-client attack fixed and changes only the server's parameter aggregation rule. Robust aggregation methods try to reduce malicious influence, but they also make assumptions about update magnitude, coordinate outliers, update distances, client sampling, and how similar honest clients should look.
 
 A successful learner should also be able to describe the core evaluation logic:
 
@@ -744,7 +744,7 @@ Teaching response:
 
 * What did Module 4 show about FedAvg under malicious clients?
 * Why is the server not allowed to use malicious-client labels in a real deployment?
-* What does it mean to change only the aggregation rule?
+* What does it mean to change only the parameter aggregation rule?
 * Why is attacked FedAvg the correct control for Module 5?
 
 ### Defense intuition prompts
@@ -1056,4 +1056,4 @@ Before teaching Module 5:
 
 Use this compressed explanation:
 
-> Module 4 showed that malicious clients can damage FedAvg because their updates are averaged with honest updates. Module 5 keeps that attack fixed and changes only the server aggregation rule. Clipping limits update size, median and trimmed mean reduce coordinate outliers, Krum and Multi-Krum use distance-to-neighbor logic, and geometric median/RFA estimates a robust center. Compare every defense against clean FedAvg and attacked FedAvg using final accuracy, defense recovery, `surrogate_poison_success_rate`, and `global_target_label_asr`. The key lesson is that defenses can help, but they make assumptions that can fail under non-IID data, adaptive attacks, or infeasible client-sampling settings.
+> Module 4 showed that malicious clients can damage FedAvg because their updates are averaged with honest updates. Module 5 keeps that attack fixed and changes only the server's parameter aggregation rule. Clipping limits update size, median and trimmed mean reduce coordinate outliers, Krum and Multi-Krum use distance-to-neighbor logic, and geometric median/RFA estimates a robust center. Compare every defense against clean FedAvg and attacked FedAvg using final accuracy, defense recovery, `surrogate_poison_success_rate`, and `global_target_label_asr`. The key lesson is that defenses can help, but they make assumptions that can fail under non-IID data, adaptive attacks, or infeasible client-sampling settings.
