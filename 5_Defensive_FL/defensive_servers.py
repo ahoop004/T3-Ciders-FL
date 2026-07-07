@@ -22,8 +22,9 @@ from torch.utils.data import DataLoader, TensorDataset
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(MODULE_DIR)
 MODULE4_DIR = os.path.join(REPO_ROOT, "4_Adversarial_FL")
+MODULE4_SRC_DIR = os.path.join(MODULE4_DIR, "src")
 
-for path in (MODULE4_DIR, REPO_ROOT):
+for path in (REPO_ROOT, MODULE4_DIR, MODULE4_SRC_DIR):
     if path not in sys.path:
         sys.path.insert(0, path)
 

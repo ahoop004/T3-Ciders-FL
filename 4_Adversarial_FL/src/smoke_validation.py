@@ -15,9 +15,10 @@ from typing import Any
 
 import torch
 
-MODULE_DIR = Path(__file__).resolve().parent
+SRC_DIR = Path(__file__).resolve().parent
+MODULE_DIR = SRC_DIR.parent
 REPO_ROOT = MODULE_DIR.parent
-for path in (str(MODULE_DIR), str(REPO_ROOT)):
+for path in (str(REPO_ROOT), str(SRC_DIR)):
     if path not in sys.path:
         sys.path.insert(0, path)
 

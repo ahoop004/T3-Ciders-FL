@@ -25,7 +25,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from common.federated_core import BaseServer
 from client import Client

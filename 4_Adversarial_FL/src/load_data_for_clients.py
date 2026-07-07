@@ -21,7 +21,7 @@ from typing import List, Tuple
 import torch
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from common.data_utils import make_client_loaders
 from util_functions import create_data, select_validation_subset

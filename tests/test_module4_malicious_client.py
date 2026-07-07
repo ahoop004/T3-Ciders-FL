@@ -9,6 +9,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULE4_DIR = REPO_ROOT / "4_Adversarial_FL"
+MODULE4_SRC_DIR = MODULE4_DIR / "src"
 
 
 def _install_module4_stubs(monkeypatch):
@@ -134,6 +135,7 @@ def _install_module4_stubs(monkeypatch):
     sys.modules.pop("algos", None)
     sys.modules.pop("smoke_validation", None)
     monkeypatch.syspath_prepend(str(MODULE4_DIR))
+    monkeypatch.syspath_prepend(str(MODULE4_SRC_DIR))
     monkeypatch.syspath_prepend(str(REPO_ROOT))
 
     return types.SimpleNamespace(

@@ -14,8 +14,9 @@ import yaml
 MODULE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = MODULE_DIR.parent
 MODULE4_DIR = REPO_ROOT / "4_Adversarial_FL"
+MODULE4_SRC_DIR = MODULE4_DIR / "src"
 
-for path in (MODULE_DIR, MODULE4_DIR, REPO_ROOT):
+for path in (REPO_ROOT, MODULE4_DIR, MODULE4_SRC_DIR, MODULE_DIR):
     path_str = str(path)
     if path_str not in sys.path:
         sys.path.insert(0, path_str)
