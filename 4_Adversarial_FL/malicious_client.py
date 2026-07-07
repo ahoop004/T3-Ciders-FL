@@ -45,8 +45,11 @@ class MaliciousClient(Client):
         schedule_cfg = self.attack_params.get("poison_rate_schedule")
         self.poison_schedule = schedule_cfg if isinstance(schedule_cfg, dict) else None
         self.target_label = self.attack_params.get("target_label")
-        if self.poison_rate and self.target_label is None:
-            raise ValueError("`target_label` must be provided when poison_rate > 0.")
+        self._validate_poison_rate(self.poison_rate, "attack.poison_rate")
+        scheduled_rates = self._configured_schedule_rates()
+        can_poison = any(rate > 0.0 for rate in [self.poison_rate, *scheduled_rates])
+        if can_poison and self.target_label is None:
+            raise ValueError("`target_label` must be provided when poison_rate can be > 0.")
         self.start_round = int(self.attack_config.get("start_round", 0))
         self._current_poison_rate = 0.0
         self._attack_active = False
@@ -198,13 +201,48 @@ class MaliciousClient(Client):
         if best_state is not None:
             self.surrogate.load_state_dict(best_state)
 
+    @staticmethod
+    def _validate_poison_rate(value: float, name: str) -> float:
+        value = float(value)
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"{name} must be in [0, 1].")
+        return value
+
+    def _configured_schedule_rates(self) -> list[float]:
+        if not self.poison_schedule:
+            return []
+
+        schedule_type = str(self.poison_schedule.get("type", "linear")).lower()
+        if schedule_type == "constant":
+            value = self._validate_poison_rate(
+                self.poison_schedule.get("value", self.poison_rate),
+                "attack.poison_rate_schedule.value",
+            )
+            return [value]
+        if schedule_type == "linear":
+            start = self._validate_poison_rate(
+                self.poison_schedule.get("start", self.poison_rate),
+                "attack.poison_rate_schedule.start",
+            )
+            end = self._validate_poison_rate(
+                self.poison_schedule.get("end", start),
+                "attack.poison_rate_schedule.end",
+            )
+            return [start, end]
+        raise ValueError(
+            "attack.poison_rate_schedule.type must be 'linear' or 'constant'."
+        )
+
     def _poison_rate_for_round(self, round_number: int, total_rounds: int) -> float:
         if not self.poison_schedule:
             return self.poison_rate
 
         schedule_type = str(self.poison_schedule.get("type", "linear")).lower()
         if schedule_type == "constant":
-            return float(self.poison_schedule.get("value", self.poison_rate))
+            return self._validate_poison_rate(
+                self.poison_schedule.get("value", self.poison_rate),
+                "attack.poison_rate_schedule.value",
+            )
 
         start = float(self.poison_schedule.get("start", self.poison_rate))
         end = float(self.poison_schedule.get("end", start))
@@ -214,7 +252,10 @@ class MaliciousClient(Client):
         progress = min(max(progress, 0.0), 1.0)
 
         if schedule_type == "linear":
-            return start + (end - start) * progress
+            return self._validate_poison_rate(
+                start + (end - start) * progress,
+                "computed poison_rate",
+            )
 
         return self.poison_rate
 

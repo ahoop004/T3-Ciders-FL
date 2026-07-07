@@ -36,6 +36,7 @@ def dist_data_per_client(
     device: torch.device,
     validation_split: dict | None = None,
     eval_subset: str = "all",
+    seed: int = 42,
 ) -> Tuple[List[DataLoader], DataLoader]:
     """Return (client_loaders, test_loader) using Dirichlet label-skew partitioning.
 
@@ -55,16 +56,26 @@ def dist_data_per_client(
         validation_split: Optional deterministic validation split config.
         eval_subset: ``"selection"``, ``"attack_eval"``, or ``"all"`` for the
             shared evaluation loader.
+        seed: Partition seed forwarded to the shared Dirichlet/IID partitioner.
 
     Returns:
         ``(client_loaders, test_loader)``
     """
     print("\nPreparing data with Dirichlet partitioner (aligned with Module 2)")
 
-    split_key = json.dumps(validation_split or {}, sort_keys=True)
-    cache_key = (
-        f"dirichlet_{dataset_name}_{num_clients}_{batch_size}_{non_iid_per}_"
-        f"{eval_subset}_{split_key}"
+    cache_key = json.dumps(
+        {
+            "partitioner": "dirichlet",
+            "data_path": os.path.abspath(os.path.expanduser(data_path)),
+            "dataset_name": dataset_name,
+            "num_clients": num_clients,
+            "batch_size": batch_size,
+            "non_iid_per": non_iid_per,
+            "eval_subset": eval_subset,
+            "validation_split": validation_split or {},
+            "seed": int(seed),
+        },
+        sort_keys=True,
     ).encode()
     cache_hash = hashlib.md5(cache_key).hexdigest()
     os.makedirs("cache", exist_ok=True)
@@ -77,7 +88,14 @@ def dist_data_per_client(
 
     train_ds, test_ds = create_data(data_path, dataset_name)
     test_ds = select_validation_subset(test_ds, validation_split, eval_subset)
-    result = make_client_loaders(train_ds, test_ds, num_clients, batch_size, non_iid_per)
+    result = make_client_loaders(
+        train_ds,
+        test_ds,
+        num_clients,
+        batch_size,
+        non_iid_per,
+        seed=int(seed),
+    )
 
     with open(cache_file, "wb") as f:
         pickle.dump(result, f)

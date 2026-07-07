@@ -89,16 +89,6 @@ def select_malicious_client_ids(
 
     attack_config = attack_config or {}
     selection = _selection_config(attack_config)
-    explicit_ids = _explicit_malicious_client_ids(attack_config)
-    if explicit_ids is not None:
-        invalid = [idx for idx in explicit_ids if idx < 0 or idx >= num_clients]
-        if invalid:
-            raise ValueError(
-                "malicious_client_ids contains id(s) outside "
-                f"[0, {num_clients - 1}]: {invalid}"
-            )
-        return explicit_ids
-
     mode = str(
         selection.get(
             "mode",
@@ -110,6 +100,16 @@ def select_malicious_client_ids(
         raise ValueError("attack.malicious_fraction must be in [0, 1].")
     if num_clients == 0 or fraction == 0.0 or mode == "none":
         return []
+
+    explicit_ids = _explicit_malicious_client_ids(attack_config)
+    if explicit_ids is not None:
+        invalid = [idx for idx in explicit_ids if idx < 0 or idx >= num_clients]
+        if invalid:
+            raise ValueError(
+                "malicious_client_ids contains id(s) outside "
+                f"[0, {num_clients - 1}]: {invalid}"
+            )
+        return explicit_ids
     if mode == "all":
         return list(range(num_clients))
 
@@ -164,6 +164,77 @@ def _make_synthetic_image_batch(
     labels = torch.arange(num_samples, dtype=torch.long) % int(num_classes)
     order = torch.randperm(num_samples, generator=generator)
     return images[order], labels[order]
+
+
+def _client_local_model(client, client_id: int) -> torch.nn.Module:
+    model = getattr(client, "y", None)
+    if model is None:
+        raise RuntimeError(f"Client {client_id} has no local model update to aggregate.")
+    return model
+
+
+def _average_tensors(values: list[torch.Tensor]) -> torch.Tensor:
+    values = [value.detach() for value in values]
+    first = values[0]
+    if torch.is_floating_point(first) or torch.is_complex(first):
+        return torch.stack(values, dim=0).mean(dim=0)
+    return first.clone()
+
+
+def _average_client_state_dicts(
+    clients,
+    client_ids: Sequence[int],
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    states = [
+        {
+            name: tensor.detach().to(device)
+            for name, tensor in _client_local_model(clients[idx], idx).state_dict().items()
+        }
+        for idx in client_ids
+    ]
+    if not states:
+        raise ValueError("Cannot average an empty list of client state dicts.")
+    return {
+        name: _average_tensors([state[name] for state in states])
+        for name in states[0]
+    }
+
+
+def _average_client_buffers(
+    clients,
+    client_ids: Sequence[int],
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    buffer_states = [
+        {
+            name: tensor.detach().to(device)
+            for name, tensor in _client_local_model(clients[idx], idx).named_buffers()
+        }
+        for idx in client_ids
+    ]
+    if not buffer_states or not buffer_states[0]:
+        return {}
+    return {
+        name: _average_tensors([state[name] for state in buffer_states])
+        for name in buffer_states[0]
+    }
+
+
+def _copy_averaged_client_buffers(
+    model: torch.nn.Module,
+    clients,
+    client_ids: Sequence[int],
+    device: torch.device,
+) -> None:
+    averaged_buffers = _average_client_buffers(clients, client_ids, device)
+    if not averaged_buffers:
+        return
+    target_buffers = dict(model.named_buffers())
+    with torch.no_grad():
+        for name, value in averaged_buffers.items():
+            if name in target_buffers:
+                target_buffers[name].copy_(value.to(target_buffers[name].device))
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +322,7 @@ class Server(BaseServer):
             self.device,
             validation_split=self.data_config.get("validation_split"),
             eval_subset=self.data_config.get("eval_subset", "all"),
+            seed=int(self.global_config.get("seed", 42)),
         )
         self.test_loader = test_dataset
         self.clients = self.create_clients(local_datasets)
@@ -469,22 +541,18 @@ class Server(BaseServer):
     # FedAvg aggregation (reads client.y parameters)
     # ------------------------------------------------------------------
     def aggregate(self, client_ids) -> None:
-        """Average client.y parameters into the global model."""
+        """Average client.y state, including BatchNorm buffers, into the global model."""
         num_participants = len(client_ids)
         if num_participants == 0:
             return
 
         self.global_model.to(self.device)
-        avg_y = [
-            torch.zeros_like(param, device=self.device)
-            for param in self.global_model.parameters()
-        ]
-        with torch.no_grad():
-            for idx in client_ids:
-                for a_y, y in zip(avg_y, self.clients[idx].y.parameters()):
-                    a_y.data.add_(y.data / num_participants)
-            for param, a_y in zip(self.global_model.parameters(), avg_y):
-                param.data = a_y.data
+        averaged_state = _average_client_state_dicts(
+            self.clients,
+            client_ids,
+            self.device,
+        )
+        self.global_model.load_state_dict(averaged_state, strict=True)
 
         # Keep alias in sync
         self.x = self.global_model
@@ -647,6 +715,12 @@ class FedAdamServer(Server):
                 m_hat = m / (1 - self.beta1 ** self.timestep)
                 v_hat = v / (1 - self.beta2 ** self.timestep)
                 p.data += self.lr * m_hat / (torch.sqrt(v_hat) + self.epsilon)
+            _copy_averaged_client_buffers(
+                self.global_model,
+                self.clients,
+                client_ids,
+                self.device,
+            )
         self.timestep += 1
         self.x = self.global_model
 
@@ -677,6 +751,12 @@ class FedAdagradServer(Server):
             for p, g, s in zip(self.global_model.parameters(), gradients, self.s):
                 s.data += torch.square(g.data)
                 p.data += self.lr * g.data / torch.sqrt(s.data + self.epsilon)
+            _copy_averaged_client_buffers(
+                self.global_model,
+                self.clients,
+                client_ids,
+                self.device,
+            )
         self.x = self.global_model
 
 
@@ -715,6 +795,12 @@ class FedYogiServer(Server):
                 m_hat = m / (1 - self.beta1 ** self.timestep)
                 v_hat = v / (1 - self.beta2 ** self.timestep)
                 p.data += self.lr * m_hat / (torch.sqrt(v_hat) + self.epsilon)
+            _copy_averaged_client_buffers(
+                self.global_model,
+                self.clients,
+                client_ids,
+                self.device,
+            )
         self.timestep += 1
         self.x = self.global_model
 
@@ -922,11 +1008,18 @@ class ScaffoldServer(Server):
         if num_participants == 0:
             return
         with torch.no_grad():
+            control_scale = 1.0 / max(self.num_clients, 1)
             for idx in client_ids:
                 for param, diff in zip(self.global_model.parameters(), self.clients[idx].delta_y):
                     param.data.add_(diff.data * self.lr / num_participants)
                 for c_g, c_d in zip(self.server_c, self.clients[idx].delta_c):
-                    c_g.data.add_(c_d.data * self.client_fraction)
+                    c_g.data.add_(c_d.data * control_scale)
+            _copy_averaged_client_buffers(
+                self.global_model,
+                self.clients,
+                client_ids,
+                self.device,
+            )
         self.x = self.global_model
 
 

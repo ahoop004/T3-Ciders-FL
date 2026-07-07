@@ -101,8 +101,9 @@ def _install_module4_stubs(monkeypatch):
         device,
         validation_split=None,
         eval_subset="all",
+        seed=42,
     ):
-        _ = (data_path, dataset_name, non_iid_per, device, validation_split, eval_subset)
+        _ = (data_path, dataset_name, non_iid_per, device, validation_split, eval_subset, seed)
         local = [make_loader(num_examples=batch_size, batch_size=batch_size) for _ in range(num_clients)]
         test_inputs = torch.rand(8, 3, 4, 4)
         test_labels = torch.tensor([0, 1, 2, 0, 1, 2, 0, 2], dtype=torch.long)
