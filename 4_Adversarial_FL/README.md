@@ -212,7 +212,7 @@ Discussion questions:
 
 ### Experiment 3: Federated attack recipe sweep
 
-Set `attack_module.run_attack_recipe_sweep: true` in `attack_module_config.yaml`, then compare random-noise, FGSM, and PGD poisoning under the selected FL algorithm.
+Set `attack_module.run_attack_recipe_sweep: true` in `attack_module_config.yaml`, run the clean baseline cell once, then run the random-noise, FGSM, and PGD attack cells under the selected FL algorithm.
 
 Discussion questions:
 
@@ -277,7 +277,7 @@ After a default notebook run, inspect these files in `4_Adversarial_FL/artifacts
 | `attack_accuracy.png` | Clean vs attacked selected-algorithm accuracy curve with attack-start marker |
 | `global_target_label_asr.png` | Clean vs attacked selected-algorithm target-label ASR curve with attack-start marker |
 | `module4_fast_validation.json` | Optional SyntheticSmoke wiring check for all supported algorithms |
-| `module4_attack_recipe_sweep.json` | Optional attack-recipe sweep payload with full clean/attacked results and a compact summary table |
+| `module4_attack_recipe_sweep.json` | Optional attack-recipe sweep payload with one clean baseline, per-recipe attacked results, and a compact summary table |
 | `attack_recipe_sweep.png` | Optional final clean accuracy, attacked accuracy, global target-label ASR, and surrogate poison success by poisoning recipe |
 | `module4_fraction_sweep.json` | Optional malicious-fraction sweep table with global attacked accuracy, `global_target_label_asr`, poisoned examples, and surrogate poison success rate |
 | `malicious_fraction_sweep.png` | Optional global attacked accuracy, global target-label ASR, and surrogate poison success rate versus malicious-client fraction |

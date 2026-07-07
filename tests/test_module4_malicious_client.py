@@ -395,10 +395,19 @@ def test_attack_module_exposes_algorithm_comparison_option():
 
     assert "RUN_ATTACK_RECIPE_SWEEP" in notebook_source
     assert "run_attack_recipe_sweep(" in notebook_source
+    assert "attack_recipe_sweep_payload = run_attack_recipe_sweep(" not in notebook_source
     assert "module4_attack_recipe_sweep.json" in notebook_source
     assert "RUN_ALGORITHM_COMPARISON" in notebook_source
     assert "run_algorithm_comparison(" in notebook_source
     assert "build_clean_attacked_summary_row" in notebook_source
+    assert "clean_baseline_for_algorithm" in notebook_source
+    assert "RUN_SELECTED_ALGORITHM_CLEAN_BASELINE" in notebook_source
+    assert 'federated_attack_results["clean"] = clean_baseline_for_algorithm(SELECTED_ALGORITHM)' in notebook_source
+    assert 'federated_attack_results["pgd_default"] = run_attack_recipe_on_server(' in notebook_source
+    assert "Run Random-Noise Sweep Attack" in notebook_source
+    assert "Run FGSM Sweep Attack" in notebook_source
+    assert "Run PGD Sweep Attack" in notebook_source
+    assert '"clean_baseline": _json_safe(clean_baseline)' in notebook_source
     for field in (
         "final_clean_accuracy",
         "final_attacked_accuracy",
