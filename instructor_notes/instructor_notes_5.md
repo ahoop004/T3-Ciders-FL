@@ -26,7 +26,7 @@ The module should help learners understand:
 * why non-IID honest clients can make defensive aggregation harder,
 * and why no implemented defense should be presented as a universal solution.
 
-Module 5 should not be taught as a new attack module. The attack path comes from Module 4. The instructional goal is defensive comparison: keep the attacker fixed, then ask what each parameter aggregation rule protects, what it costs, and where it fails. Model buffers such as BatchNorm running statistics are averaged across selected clients so the FedAvg control remains aligned with Module 4.
+Module 5 should not be taught as a new attack module. The attack path comes from Module 4. The instructional goal is defensive comparison: keep the attacker fixed, then ask what each parameter aggregation rule protects, what it costs, and where it fails. Floating model-buffer deltas such as BatchNorm running statistics follow the active defense; Krum and Multi-Krum update buffers only from the clients selected by the parameter aggregation step.
 
 ---
 

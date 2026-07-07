@@ -247,7 +247,10 @@ class DefensiveServer(AdversarialServer):
                 param.data.add_(
                     update.to(device=param.device, dtype=param.dtype) * self.server_stepsize
                 )
-        buffer_diagnostics = self._copy_averaged_client_buffers(client_ids)
+            buffer_diagnostics = self._aggregate_client_buffers(
+                client_ids,
+                aggregation.diagnostics,
+            )
 
         self.last_defense_diagnostics = {
             "round": int(self.current_round + 1),
@@ -283,14 +286,37 @@ class DefensiveServer(AdversarialServer):
 
         return updates
 
-    def _copy_averaged_client_buffers(self, client_ids: Sequence[int]) -> dict[str, Any]:
-        """Average client model buffers so BatchNorm state follows Module 4 FedAvg."""
+    def _aggregate_client_buffers(
+        self,
+        client_ids: Sequence[int],
+        parameter_aggregation_diagnostics: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Aggregate client model buffers without bypassing the active defense."""
         target_buffers = dict(self.global_model.named_buffers())
         if not target_buffers:
             return {"strategy": "none", "buffer_count": 0}
 
+        source_client_ids, source_strategy = self._buffer_source_client_ids(
+            client_ids,
+            parameter_aggregation_diagnostics,
+        )
+        if not source_client_ids:
+            return {"strategy": "none", "buffer_count": 0}
+
+        floating_names = [
+            name
+            for name, tensor in target_buffers.items()
+            if torch.is_floating_point(tensor) or torch.is_complex(tensor)
+        ]
+        floating_name_set = set(floating_names)
+        non_floating_names = [
+            name
+            for name in target_buffers
+            if name not in floating_name_set
+        ]
+
         buffer_states: list[dict[str, torch.Tensor]] = []
-        for idx in client_ids:
+        for idx in source_client_ids:
             local_model = getattr(self.clients[idx], "y", None)
             if local_model is None:
                 raise RuntimeError(
@@ -303,21 +329,83 @@ class DefensiveServer(AdversarialServer):
                 }
             )
 
-        if not buffer_states or not buffer_states[0]:
+        if not buffer_states:
             return {"strategy": "none", "buffer_count": 0}
 
-        copied = 0
-        with torch.no_grad():
-            for name in buffer_states[0]:
-                if name not in target_buffers:
-                    continue
-                values = [state[name] for state in buffer_states]
-                averaged = _average_buffer_values(values)
-                target = target_buffers[name]
-                target.copy_(averaged.to(device=target.device, dtype=target.dtype))
-                copied += 1
+        copied_floating = 0
+        buffer_aggregation_diagnostics: dict[str, Any] = {}
+        if floating_names:
+            buffer_updates: list[list[torch.Tensor]] = []
+            for state in buffer_states:
+                local_update = []
+                for name in floating_names:
+                    if name not in state:
+                        raise RuntimeError(f"Client buffer state is missing {name!r}.")
+                    local_update.append(
+                        state[name].to(self.device) - target_buffers[name].detach().to(self.device)
+                    )
+                buffer_updates.append(local_update)
 
-        return {"strategy": "client_buffer_average", "buffer_count": copied}
+            buffer_defense_config = self._buffer_defense_config(source_strategy)
+            buffer_aggregation = aggregate_client_updates(
+                buffer_updates,
+                buffer_defense_config,
+            )
+            buffer_aggregation_diagnostics = buffer_aggregation.diagnostics
+            for name, update in zip(floating_names, buffer_aggregation.update):
+                target = target_buffers[name]
+                target.add_(
+                    update.to(device=target.device, dtype=target.dtype)
+                    * self.server_stepsize
+                )
+                copied_floating += 1
+
+        copied_non_floating = 0
+        if non_floating_names:
+            source_state = buffer_states[0]
+            for name in non_floating_names:
+                if name not in source_state:
+                    raise RuntimeError(f"Client buffer state is missing {name!r}.")
+                target = target_buffers[name]
+                target.copy_(source_state[name].to(device=target.device, dtype=target.dtype))
+                copied_non_floating += 1
+
+        return {
+            "strategy": "defense_aware_buffer_delta",
+            "source_strategy": source_strategy,
+            "source_client_ids": [int(idx) for idx in source_client_ids],
+            "buffer_count": copied_floating + copied_non_floating,
+            "floating_buffer_count": copied_floating,
+            "non_floating_buffer_count": copied_non_floating,
+            "floating_buffer_aggregation": buffer_aggregation_diagnostics,
+        }
+
+    def _buffer_source_client_ids(
+        self,
+        client_ids: Sequence[int],
+        parameter_aggregation_diagnostics: dict[str, Any],
+    ) -> tuple[list[int], str]:
+        """Return clients whose buffers may influence the global buffer state."""
+        defense_name = str(self.defense_config.get("name", "fedavg")).lower()
+        if defense_name in {"krum", "multi_krum", "multikrum"}:
+            selected_indices = parameter_aggregation_diagnostics.get("selected_indices", [])
+            source_client_ids = []
+            for selected_index in selected_indices:
+                selected_index = int(selected_index)
+                if selected_index < 0 or selected_index >= len(client_ids):
+                    raise RuntimeError(
+                        "Defense diagnostics selected a client index outside the "
+                        f"current participant list: {selected_index}"
+                    )
+                source_client_ids.append(int(client_ids[selected_index]))
+            return source_client_ids, "parameter_selected_clients"
+        return [int(idx) for idx in client_ids], "all_participating_clients"
+
+    def _buffer_defense_config(self, source_strategy: str) -> dict[str, Any]:
+        """Use the active defense for buffers unless parameters already selected clients."""
+        if source_strategy == "parameter_selected_clients":
+            return {"name": "fedavg"}
+        return dict(self.defense_config)
 
 
 class FedAvgDefenseServer(DefensiveServer):
@@ -372,15 +460,6 @@ SERVER_REGISTRY: dict[str, Type[DefensiveServer]] = {
     "geometric_median": GeometricMedianServer,
     "rfa": GeometricMedianServer,
 }
-
-
-def _average_buffer_values(values: Sequence[torch.Tensor]) -> torch.Tensor:
-    """Average floating buffers and preserve the first non-floating buffer."""
-    values = [value.detach() for value in values]
-    first = values[0]
-    if torch.is_floating_point(first) or torch.is_complex(first):
-        return torch.stack(values, dim=0).mean(dim=0)
-    return first.clone()
 
 
 def _is_synthetic_smoke_dataset(dataset_name: str | None) -> bool:

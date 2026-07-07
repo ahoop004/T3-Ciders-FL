@@ -21,9 +21,10 @@ The main lesson is that robust aggregation can help, but it is not free. Each
 defense trades off clean accuracy, attacked accuracy, surrogate poison success,
 `global_target_label_asr`, runtime, and assumptions about the attacker.
 
-Implementation note: Module 5 applies robust aggregation to parameter deltas.
-Model buffers such as BatchNorm running statistics are averaged across selected
-clients after the parameter update, matching the Module 4 FedAvg handoff behavior.
+Implementation note: Module 5 applies robust aggregation to parameter deltas
+and to floating model-buffer deltas such as BatchNorm running statistics. Krum
+and Multi-Krum update buffers only from the clients selected by the parameter
+aggregation step.
 
 ## Files
 
