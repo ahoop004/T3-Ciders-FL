@@ -6,10 +6,10 @@
 **Exercises:** 30-60 min  
 **Notebook:** `4_Adversarial_FL/Adv_FL.ipynb`  
 **Split notebooks:** `train_v3.ipynb` → `train_surrogate.ipynb` → `attack_module.ipynb`  
-**Focused attack notebooks:** `noise_attack.ipynb`, `fgsm_attack.ipynb`, `pgd_attack.ipynb`  
+**Focused attack notebooks:** `clean_baselines.ipynb`, `noise_attack.ipynb`, `fgsm_attack.ipynb`, `pgd_attack.ipynb`  
 **Where to run:** ODU HPC (Wahab via Open OnDemand)
 
-This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students prepare a clean MobileNetV3 target checkpoint, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, run malicious-client poisoning experiments for the selected supported FL algorithm, optionally sweep FL poisoning recipes, and optionally compare several algorithms under the same attack recipe. The focused attack notebooks split random noise, FGSM, and PGD into separate straight-line labs with local config cells, clean FedAvg baselines, basic FedAvg attacks, attack-parameter sweeps, and algorithm sweeps.
+This module studies how a federated learning system behaves when the inputs or clients are adversarial. Students prepare a clean MobileNetV3 target checkpoint, train a MobileNetV2 surrogate, compare random noise with FGSM and PGD, test black-box transfer from surrogate to target, run malicious-client poisoning experiments for the selected supported FL algorithm, optionally sweep FL poisoning recipes, and optionally compare several algorithms under the same attack recipe. The focused attack notebooks split clean baselines, random noise, FGSM, and PGD into separate straight-line labs with local config cells, a shared clean-baseline artifact, visible training and poisoning output, basic FedAvg attacks, attack-parameter sweeps, algorithm sweeps, final plots, and poisoned sample images.
 
 The main lesson is that clean accuracy is not enough. A model can perform well on unmodified Imagenette examples while losing robust accuracy under adversarial perturbations or showing target-label behavior after poisoned FL training. Module 5 uses these failures to motivate defensive aggregation.
 
@@ -108,13 +108,14 @@ FedOpt-style malicious clients poison local minibatches and then report `delta_y
 2. `train_surrogate.ipynb` trains the MobileNetV2 surrogate and writes the surrogate metrics/checkpoint.
 3. `attack_module.ipynb` loads those artifacts, runs surrogate attacks, evaluates transfer, runs clean-vs-attacked FL for the selected algorithm, optionally sweeps attack recipes or malicious-client fraction, and optionally compares configured algorithms under one attack recipe.
 
-For a simpler workshop path, run `train_v3.ipynb`, run `train_surrogate.ipynb`, then choose one focused attack notebook:
+For a simpler workshop path, run `train_v3.ipynb`, run `train_surrogate.ipynb`, run `clean_baselines.ipynb`, then choose one focused attack notebook:
 
-1. `noise_attack.ipynb` runs random-noise poisoning without surrogate gradients.
-2. `fgsm_attack.ipynb` runs one-step targeted FGSM poisoning.
-3. `pgd_attack.ipynb` runs iterative targeted PGD poisoning.
+1. `clean_baselines.ipynb` runs clean FL once and writes `artifacts/module4_clean_baselines.json`.
+2. `noise_attack.ipynb` runs random-noise poisoning without surrogate gradients and reads the clean-baseline artifact.
+3. `fgsm_attack.ipynb` runs one-step targeted FGSM poisoning and reads the clean-baseline artifact.
+4. `pgd_attack.ipynb` runs iterative targeted PGD poisoning and reads the clean-baseline artifact.
 
-Each focused attack notebook keeps its settings in one config cell instead of a YAML file. The four experiment cells are intentionally direct: clean FedAvg baseline, basic attacked FedAvg, attack-parameter sweep, and algorithm sweep.
+Each focused notebook keeps its settings in one config cell instead of a YAML file. The attack notebooks are intentionally direct: load clean-baseline artifact, basic attacked FedAvg with poisoning counters, attack-parameter sweep, algorithm sweep, then a final plot-and-samples cell.
 
 Across the complete or split path, students will:
 
@@ -143,7 +144,7 @@ The original split notebooks each load a stage-specific config in `4_Adversarial
 | `train_surrogate_config.yaml` | `train_surrogate.ipynb` | `data_config`, `global_config`, surrogate artifacts, `model_config`, and `surrogate_training` |
 | `attack_module_config.yaml` | `attack_module.ipynb` | `data_config`, `global_config`, attack artifacts, `surrogate_training`, selected algorithm settings, `attack_module`, and `attack` |
 
-The complete `Adv_FL.ipynb` remains compatible with the legacy `config.yaml`. The focused `noise_attack.ipynb`, `fgsm_attack.ipynb`, and `pgd_attack.ipynb` notebooks do not use YAML configs; edit the visible `CONFIG` cell in each notebook.
+The complete `Adv_FL.ipynb` remains compatible with the legacy `config.yaml`. The focused `clean_baselines.ipynb`, `noise_attack.ipynb`, `fgsm_attack.ipynb`, and `pgd_attack.ipynb` notebooks do not use YAML configs; edit the visible `CONFIG` cell in each notebook.
 
 Key split-workflow controls:
 

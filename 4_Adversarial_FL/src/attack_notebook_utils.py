@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 SRC_DIR = Path(__file__).resolve().parent
 MODULE_DIR = SRC_DIR.parent
@@ -31,7 +32,16 @@ for path in (REPO_ROOT, SRC_DIR):
         sys.path.insert(0, path_text)
 
 from algos import canonical_algorithm_name, get_algorithm_server_class
-from util_functions import evaluate_fn, set_logger, set_seed, target_label_prediction_rate
+from attacks import denormalize_pixels, pixel_linf_norm
+from malicious_client import MaliciousClient
+from util_functions import (
+    create_data,
+    evaluate_fn,
+    select_validation_subset,
+    set_logger,
+    set_seed,
+    target_label_prediction_rate,
+)
 
 
 SUMMARY_COLUMNS = [
@@ -166,15 +176,91 @@ def run_attack_parameter_sweep(
     return {"results": results, "table": round_table(table)}
 
 
+def clean_baselines_path(context: dict[str, Any]) -> Path:
+    filename = context["config"].get("artifacts", {}).get(
+        "clean_baselines", "module4_clean_baselines.json"
+    )
+    return context["artifact_dir"] / filename
+
+
+def run_clean_baselines(
+    context: dict[str, Any],
+    algorithms: list[str] | None = None,
+) -> dict[str, Any]:
+    """Run clean FL baselines once and save the artifact used by attack notebooks."""
+    algorithms = algorithms or context["config"].get("clean_baseline_algorithms", ["FedAvg"])
+    results = {}
+    rows = []
+    for algorithm in algorithms:
+        result = run_clean_baseline(context, algorithm)
+        results[result["algorithm"]] = result
+        rows.append(
+            {
+                "algorithm": result["algorithm"],
+                "final_accuracy": result["final_accuracy"],
+                "final_loss": result["final_loss"],
+                "global_target_label_asr": result["global_target_label_asr"],
+                "num_rounds": result["num_rounds"],
+            }
+        )
+
+    table = round_table(pd.DataFrame(rows))
+    payload = {
+        "source_notebook": "clean_baselines.ipynb",
+        "results": results,
+        "summary_table": table.to_dict(orient="records"),
+    }
+    with clean_baselines_path(context).open("w") as f:
+        json.dump(json_safe(payload), f, indent=2)
+    return {
+        "results": results,
+        "table": table,
+        "summary_table": table.to_dict(orient="records"),
+        "path": clean_baselines_path(context),
+    }
+
+
+def load_clean_baselines(context: dict[str, Any]) -> dict[str, Any]:
+    path = clean_baselines_path(context)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Clean baseline artifact not found: {path}. "
+            "Run clean_baselines.ipynb before running an attack notebook."
+        )
+    with path.open("r") as f:
+        payload = json.load(f)
+    return payload
+
+
+def clean_result_from_artifact(
+    clean_payload: dict[str, Any],
+    algorithm: str = "FedAvg",
+) -> dict[str, Any]:
+    name = canonical_algorithm_name(algorithm)
+    return clean_payload["results"][name]
+
+
+def clean_baselines_table(clean_payload: dict[str, Any]) -> pd.DataFrame:
+    if "table" in clean_payload:
+        return round_table(clean_payload["table"])
+    return round_table(pd.DataFrame(clean_payload.get("summary_table", [])))
+
+
 def run_algorithm_sweep(
     context: dict[str, Any],
-    fedavg_clean_result: dict[str, Any] | None = None,
+    clean_results: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     results = {}
     rows = []
     for algorithm in context["config"]["algorithm_sweep"]:
         name = canonical_algorithm_name(algorithm)
-        clean = fedavg_clean_result if name == "FedAvg" and fedavg_clean_result else run_clean_baseline(context, name)
+        if name not in clean_results:
+            raise KeyError(
+                f"Clean baseline for {name} is missing from the clean-baseline artifact. "
+                "Run clean_baselines.ipynb with this algorithm included in "
+                "CONFIG['clean_baseline_algorithms']."
+            )
+        clean = clean_results[name]
         attacked = run_basic_attack(context, name)
         results[name] = {"clean": clean, "attacked": attacked}
         rows.append(clean_attack_row(clean, attacked, context["config"]["attack_name"]))
@@ -343,6 +429,32 @@ def plot_clean_history(clean_result: dict[str, Any], *, title: str) -> None:
     plt.show()
 
 
+def plot_clean_baselines_summary(clean_payload: dict[str, Any], *, title: str) -> None:
+    results = clean_payload["results"]
+    table = clean_baselines_table(clean_payload)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+    for algorithm, result in results.items():
+        accuracy = result.get("history", {}).get("accuracy", [])
+        rounds = np.arange(1, len(accuracy) + 1)
+        axes[0].plot(rounds, accuracy, marker="o", label=algorithm)
+    axes[0].set_title("Clean Accuracy by Round")
+    axes[0].set_xlabel("Round")
+    axes[0].set_ylabel("Accuracy (%)")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    axes[1].bar(table["algorithm"], table["final_accuracy"], color="tab:blue")
+    axes[1].set_title("Final Clean Accuracy")
+    axes[1].set_ylabel("Accuracy (%)")
+    axes[1].tick_params(axis="x", rotation=25)
+    axes[1].grid(True, axis="y", alpha=0.3)
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    plt.show()
+
+
 def plot_clean_vs_attack(
     clean_result: dict[str, Any],
     attacked_result: dict[str, Any],
@@ -423,6 +535,110 @@ def plot_algorithm_sweep(table: pd.DataFrame, *, title: str) -> None:
     plot_table = table.copy()
     plot_table["run"] = plot_table["algorithm"]
     plot_sweep_table(plot_table, title=title)
+
+
+def make_poisoned_sample_batch(
+    context: dict[str, Any],
+    *,
+    count: int = 6,
+) -> dict[str, Any]:
+    cfg = attack_config(context)
+    attack_params = cfg["attack"]
+    target_label = int(attack_params.get("target_label", 0))
+    device = torch.device(context["global_config"]["device"])
+
+    _, eval_data = create_data(
+        context["data_config"]["dataset_path"],
+        context["data_config"]["dataset_name"],
+    )
+    eval_data = select_validation_subset(
+        eval_data,
+        context["data_config"].get("validation_split"),
+        context["data_config"].get("eval_subset", "attack_eval"),
+    )
+    loader = DataLoader(eval_data, batch_size=max(count * 4, count), shuffle=False)
+
+    clean_batches = []
+    label_batches = []
+    for images, labels in loader:
+        keep = labels != target_label
+        clean_batches.append(images[keep])
+        label_batches.append(labels[keep])
+        if sum(batch.size(0) for batch in clean_batches) >= count:
+            break
+
+    clean_images = torch.cat(clean_batches, dim=0)[:count]
+    clean_labels = torch.cat(label_batches, dim=0)[:count].long()
+    target_labels = torch.full_like(clean_labels, target_label)
+
+    sample_loader = DataLoader(
+        TensorDataset(clean_images, clean_labels),
+        batch_size=count,
+        shuffle=False,
+    )
+    client = MaliciousClient(
+        client_id=0,
+        local_data=sample_loader,
+        device=device,
+        num_epochs=0,
+        criterion=torch.nn.CrossEntropyLoss(),
+        lr=0.0,
+        attack_config=cfg,
+    )
+    client.surrogate.eval()
+
+    clean_device = clean_images.float().to(device)
+    targets_device = target_labels.to(device)
+    poisoned_device = client.perform_attack(clean_device, targets_device)
+
+    with torch.no_grad():
+        clean_preds = client.surrogate(clean_device).argmax(dim=1).cpu()
+        poisoned_preds = client.surrogate(poisoned_device).argmax(dim=1).cpu()
+
+    return {
+        "clean": clean_images.cpu(),
+        "poisoned": poisoned_device.detach().cpu(),
+        "labels": clean_labels.cpu(),
+        "target_labels": target_labels.cpu(),
+        "clean_preds": clean_preds,
+        "poisoned_preds": poisoned_preds,
+        "linf": pixel_linf_norm(clean_device, poisoned_device).detach().cpu(),
+        "attack_params": deepcopy(attack_params),
+    }
+
+
+def plot_poisoned_samples(samples: dict[str, Any], *, title: str) -> None:
+    clean = samples["clean"]
+    poisoned = samples["poisoned"]
+    labels = samples["labels"]
+    targets = samples["target_labels"]
+    clean_preds = samples["clean_preds"]
+    poisoned_preds = samples["poisoned_preds"]
+    linf = samples["linf"]
+    count = int(clean.size(0))
+
+    fig, axes = plt.subplots(2, count, figsize=(2.2 * count, 4.8), squeeze=False)
+    for idx in range(count):
+        axes[0, idx].imshow(image_for_display(clean[idx]))
+        axes[0, idx].set_title(f"Clean\nlabel {int(labels[idx])}, pred {int(clean_preds[idx])}", fontsize=9)
+        axes[0, idx].axis("off")
+
+        axes[1, idx].imshow(image_for_display(poisoned[idx]))
+        axes[1, idx].set_title(
+            f"Poisoned\ntarget {int(targets[idx])}, pred {int(poisoned_preds[idx])}\nLinf {float(linf[idx]):.4f}",
+            fontsize=9,
+        )
+        axes[1, idx].axis("off")
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    plt.show()
+
+
+def image_for_display(image: torch.Tensor) -> np.ndarray:
+    image = denormalize_pixels(image.unsqueeze(0)).squeeze(0)
+    image = image.clamp(0.0, 1.0).permute(1, 2, 0)
+    return image.detach().cpu().numpy()
 
 
 def save_summary(context: dict[str, Any], summary: dict[str, Any]) -> None:
