@@ -1,0 +1,572 @@
+{
+  "source_notebook": "clean_baselines.ipynb",
+  "results": {
+    "FedAvg": {
+      "algorithm": "FedAvg",
+      "run": "clean",
+      "final_loss": 0.07700911071151495,
+      "final_accuracy": 97.70642201834863,
+      "global_target_label_asr": 0.22611644997173544,
+      "surrogate_poison_success_rate": 0.0,
+      "poisoned_examples": 0,
+      "candidate_examples": 0,
+      "sampled_malicious_clients": 0,
+      "malicious_fraction": 0.0,
+      "attack_params": {
+        "type": "random_noise",
+        "target_label": 0,
+        "poison_rate": 0.0,
+        "step_size": 0.0,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "num_rounds": 10,
+      "history": {
+        "loss": [
+          0.07673481665551662,
+          0.07682685041800141,
+          0.0767229925841093,
+          0.07679223036393523,
+          0.07678868621587753,
+          0.07694249972701073,
+          0.07695962581783533,
+          0.077034005895257,
+          0.07706968439742923,
+          0.07700911071151495
+        ],
+        "accuracy": [
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.70642201834863,
+          97.70642201834863,
+          97.65545361875637,
+          97.70642201834863,
+          97.65545361875637,
+          97.70642201834863
+        ],
+        "surrogate_poison_success_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "global_target_label_asr": [
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544
+        ],
+        "poisoned_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "candidate_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "sampled_malicious_clients": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "FedAdam": {
+      "algorithm": "FedAdam",
+      "run": "clean",
+      "final_loss": 0.07698535872623324,
+      "final_accuracy": 97.70642201834863,
+      "global_target_label_asr": 0.22611644997173544,
+      "surrogate_poison_success_rate": 0.0,
+      "poisoned_examples": 0,
+      "candidate_examples": 0,
+      "sampled_malicious_clients": 0,
+      "malicious_fraction": 0.0,
+      "attack_params": {
+        "type": "random_noise",
+        "target_label": 0,
+        "poison_rate": 0.0,
+        "step_size": 0.0,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "num_rounds": 10,
+      "history": {
+        "loss": [
+          0.07673157472163439,
+          0.07681904733181,
+          0.07678529294207692,
+          0.07680087443441153,
+          0.07679518358781934,
+          0.07691693678498268,
+          0.07688562385737896,
+          0.07699922705069184,
+          0.0770118860527873,
+          0.07698535872623324
+        ],
+        "accuracy": [
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.70642201834863,
+          97.70642201834863,
+          97.65545361875637,
+          97.70642201834863,
+          97.70642201834863,
+          97.70642201834863
+        ],
+        "surrogate_poison_success_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "global_target_label_asr": [
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544
+        ],
+        "poisoned_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "candidate_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "sampled_malicious_clients": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "FedAdagrad": {
+      "algorithm": "FedAdagrad",
+      "run": "clean",
+      "final_loss": 0.0771701131016016,
+      "final_accuracy": 97.65545361875637,
+      "global_target_label_asr": 0.22611644997173544,
+      "surrogate_poison_success_rate": 0.0,
+      "poisoned_examples": 0,
+      "candidate_examples": 0,
+      "sampled_malicious_clients": 0,
+      "malicious_fraction": 0.0,
+      "attack_params": {
+        "type": "random_noise",
+        "target_label": 0,
+        "poison_rate": 0.0,
+        "step_size": 0.0,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "num_rounds": 10,
+      "history": {
+        "loss": [
+          0.07674217782914639,
+          0.07687223423272371,
+          0.07688703387975693,
+          0.07693944778293371,
+          0.07694042846560478,
+          0.07705460302531719,
+          0.07703932095319033,
+          0.07714897952973843,
+          0.07716267602518201,
+          0.0771701131016016
+        ],
+        "accuracy": [
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.70642201834863,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637
+        ],
+        "surrogate_poison_success_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "global_target_label_asr": [
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544
+        ],
+        "poisoned_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "candidate_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "sampled_malicious_clients": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "FedYogi": {
+      "algorithm": "FedYogi",
+      "run": "clean",
+      "final_loss": 0.07699285633862019,
+      "final_accuracy": 97.70642201834863,
+      "global_target_label_asr": 0.22611644997173544,
+      "surrogate_poison_success_rate": 0.0,
+      "poisoned_examples": 0,
+      "candidate_examples": 0,
+      "sampled_malicious_clients": 0,
+      "malicious_fraction": 0.0,
+      "attack_params": {
+        "type": "random_noise",
+        "target_label": 0,
+        "poison_rate": 0.0,
+        "step_size": 0.0,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "num_rounds": 10,
+      "history": {
+        "loss": [
+          0.07673157472163439,
+          0.0768123334273696,
+          0.07679702481254935,
+          0.07680151611566544,
+          0.07678639516234398,
+          0.07690483750775456,
+          0.0768930041231215,
+          0.07700559264048934,
+          0.07701129280030727,
+          0.07699285633862019
+        ],
+        "accuracy": [
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.70642201834863,
+          97.70642201834863,
+          97.65545361875637,
+          97.70642201834863,
+          97.70642201834863,
+          97.70642201834863
+        ],
+        "surrogate_poison_success_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "global_target_label_asr": [
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544
+        ],
+        "poisoned_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "candidate_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "sampled_malicious_clients": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "Scaffold": {
+      "algorithm": "Scaffold",
+      "run": "clean",
+      "final_loss": 0.07703808601945639,
+      "final_accuracy": 97.65545361875637,
+      "global_target_label_asr": 0.22611644997173544,
+      "surrogate_poison_success_rate": 0.0,
+      "poisoned_examples": 0,
+      "candidate_examples": 0,
+      "sampled_malicious_clients": 0,
+      "malicious_fraction": 0.0,
+      "attack_params": {
+        "type": "random_noise",
+        "target_label": 0,
+        "poison_rate": 0.0,
+        "step_size": 0.0,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "num_rounds": 10,
+      "history": {
+        "loss": [
+          0.07677299482747912,
+          0.07691736565902829,
+          0.07681255042552948,
+          0.07682307250797749,
+          0.0768456682562828,
+          0.07697108294814825,
+          0.07692379737272859,
+          0.0770645709708333,
+          0.07703503267839551,
+          0.07703808601945639
+        ],
+        "accuracy": [
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.70642201834863,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637,
+          97.65545361875637
+        ],
+        "surrogate_poison_success_rate": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "global_target_label_asr": [
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544,
+          0.22611644997173544
+        ],
+        "poisoned_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "candidate_examples": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "sampled_malicious_clients": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "summary_table": [
+    {
+      "algorithm": "FedAvg",
+      "final_accuracy": 97.71,
+      "final_loss": 0.077,
+      "global_target_label_asr": 0.23,
+      "num_rounds": 10
+    },
+    {
+      "algorithm": "FedAdam",
+      "final_accuracy": 97.71,
+      "final_loss": 0.077,
+      "global_target_label_asr": 0.23,
+      "num_rounds": 10
+    },
+    {
+      "algorithm": "FedAdagrad",
+      "final_accuracy": 97.66,
+      "final_loss": 0.0772,
+      "global_target_label_asr": 0.23,
+      "num_rounds": 10
+    },
+    {
+      "algorithm": "FedYogi",
+      "final_accuracy": 97.71,
+      "final_loss": 0.077,
+      "global_target_label_asr": 0.23,
+      "num_rounds": 10
+    },
+    {
+      "algorithm": "Scaffold",
+      "final_accuracy": 97.66,
+      "final_loss": 0.077,
+      "global_target_label_asr": 0.23,
+      "num_rounds": 10
+    }
+  ]
+}

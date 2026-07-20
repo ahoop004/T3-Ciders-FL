@@ -1,0 +1,123 @@
+{
+  "data_config": {
+    "dataset_path": "./Data/Imagenette",
+    "dataset_name": "Imagenette",
+    "non_iid_per": 0,
+    "eval_subset": "selection",
+    "validation_split": {
+      "enabled": true,
+      "seed": 42,
+      "selection_fraction": 0.5
+    }
+  },
+  "global_config": {
+    "seed": 42,
+    "device": "cuda",
+    "resolved_device": "cuda"
+  },
+  "artifacts": {
+    "dir": "artifacts",
+    "config_snapshot": "module4_target_config_used.json",
+    "target_metrics": "module4_target_training.json",
+    "target_checkpoint": "module4_v3_target.pt",
+    "target_history_plot": "target_training_history.png"
+  },
+  "target_training": {
+    "notebook": "train_v3.ipynb",
+    "mode": "centralized",
+    "profile": "tuned_imagenette",
+    "selected_profile": "tuned_imagenette",
+    "resolved_mode": "centralized"
+  },
+  "target_training_profiles": {
+    "quick": {
+      "description": "Fast classroom run for validating the Module 4 handoff artifacts.",
+      "num_epochs": 4,
+      "batch_size": 64,
+      "eval_batch_size": 512,
+      "freeze_backbone": false,
+      "use_amp": false,
+      "early_stop_patience": 0,
+      "optimizer": {
+        "name": "sgd",
+        "lr": 0.002,
+        "momentum": 0.0,
+        "weight_decay": 0.0
+      },
+      "scheduler": {
+        "name": "none"
+      },
+      "criterion": {
+        "label_smoothing": 0.0
+      }
+    },
+    "tuned_imagenette": {
+      "description": "Longer MobileNetV3-Small fine-tuning run; reduce batch size if GPU memory is tight.",
+      "num_epochs": 500,
+      "batch_size": 64,
+      "eval_batch_size": 512,
+      "freeze_backbone": false,
+      "use_amp": true,
+      "early_stop_patience": 8,
+      "optimizer": {
+        "name": "sgd",
+        "lr": 0.002,
+        "momentum": 0.9,
+        "weight_decay": 4e-05
+      },
+      "scheduler": {
+        "name": "warmup_cosine",
+        "warmup_epochs": 5,
+        "min_lr": 1e-05
+      },
+      "criterion": {
+        "label_smoothing": 0.0
+      }
+    }
+  },
+  "model_config": {
+    "module": "model",
+    "name": "MobileNetV3Transfer",
+    "kwargs": {
+      "pretrained": true,
+      "num_classes": 10,
+      "dropout": 0.1
+    }
+  },
+  "algorithms": {
+    "FedAvg": {
+      "fed_config": {
+        "num_epochs": 3,
+        "batch_size": 64,
+        "local_stepsize": 0.002
+      },
+      "optim_config": {}
+    }
+  },
+  "target_training_effective": {
+    "description": "Longer MobileNetV3-Small fine-tuning run; reduce batch size if GPU memory is tight.",
+    "num_epochs": 500,
+    "batch_size": 64,
+    "eval_batch_size": 512,
+    "freeze_backbone": false,
+    "use_amp": true,
+    "early_stop_patience": 8,
+    "optimizer": {
+      "name": "sgd",
+      "lr": 0.002,
+      "momentum": 0.9,
+      "weight_decay": 4e-05
+    },
+    "scheduler": {
+      "name": "warmup_cosine",
+      "warmup_epochs": 5,
+      "min_lr": 1e-05
+    },
+    "criterion": {
+      "label_smoothing": 0.0
+    },
+    "notebook": "train_v3.ipynb",
+    "mode": "centralized",
+    "profile": "tuned_imagenette"
+  }
+}

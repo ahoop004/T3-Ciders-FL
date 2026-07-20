@@ -1,0 +1,35 @@
+{
+  "random_noise": {
+    "mean_linf": 0.031372375786304474,
+    "max_linf": 0.0313725471496582,
+    "recipe": "random_noise",
+    "attack": "Random",
+    "epsilon": 0.03137255,
+    "target_clean_accuracy": 100.0,
+    "target_robust_accuracy": 100.0,
+    "target_model_target_label_success_rate": 0.0,
+    "surrogate_to_target_transfer_success_rate": 0.0
+  },
+  "fgsm_default": {
+    "mean_linf": 0.03137260675430298,
+    "max_linf": 0.03137260675430298,
+    "recipe": "fgsm_default",
+    "attack": "FGSM",
+    "epsilon": 0.03137255,
+    "target_clean_accuracy": 100.0,
+    "target_robust_accuracy": 93.75,
+    "target_model_target_label_success_rate": 0.0,
+    "surrogate_to_target_transfer_success_rate": 6.25
+  },
+  "pgd_default": {
+    "mean_linf": 0.03137260675430298,
+    "max_linf": 0.03137260675430298,
+    "recipe": "pgd_default",
+    "attack": "PGD",
+    "epsilon": 0.03137255,
+    "target_clean_accuracy": 100.0,
+    "target_robust_accuracy": 100.0,
+    "target_model_target_label_success_rate": 0.0,
+    "surrogate_to_target_transfer_success_rate": 0.0
+  }
+}

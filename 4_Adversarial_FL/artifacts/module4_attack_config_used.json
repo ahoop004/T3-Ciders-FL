@@ -1,0 +1,378 @@
+{
+  "data_config": {
+    "dataset_path": "./Data/Imagenette",
+    "dataset_name": "Imagenette",
+    "non_iid_per": 0,
+    "eval_subset": "attack_eval",
+    "validation_split": {
+      "enabled": true,
+      "seed": 42,
+      "selection_fraction": 0.5
+    }
+  },
+  "global_config": {
+    "seed": 42,
+    "device": "cuda",
+    "resolved_device": "cuda"
+  },
+  "artifacts": {
+    "dir": "artifacts",
+    "config_snapshot": "module4_attack_config_used.json",
+    "target_metrics": "module4_target_training.json",
+    "target_checkpoint": "module4_v3_target.pt",
+    "baseline_metrics": "module4_federated_baseline.json",
+    "surrogate_metrics": "module4_surrogate.json",
+    "surrogate_checkpoint": "module4_surrogate.pt",
+    "surrogate_attack_metrics": "module4_surrogate_attacks.json",
+    "surrogate_attack_plot": "surrogate_attack_success_by_attack.png",
+    "transfer_metrics": "module4_transfer_results.json",
+    "federated_attack_metrics": "module4_federated_attacks.json",
+    "federated_attack_plot": "attack_accuracy.png",
+    "federated_attack_asr_plot": "global_target_label_asr.png",
+    "attack_recipe_sweep_metrics": "module4_attack_recipe_sweep.json",
+    "attack_recipe_sweep_plot": "attack_recipe_sweep.png",
+    "fraction_sweep_metrics": "module4_fraction_sweep.json",
+    "fraction_sweep_plot": "malicious_fraction_sweep.png",
+    "algorithm_comparison_metrics": "module4_algorithm_comparison.json",
+    "algorithm_comparison_plot": "algorithm_comparison.png",
+    "fast_validation_metrics": "module4_fast_validation.json"
+  },
+  "attack_module": {
+    "notebook": "attack_module.ipynb",
+    "selected_algorithm": "FedAvg",
+    "run_surrogate_attacks": true,
+    "run_transfer_attacks": true,
+    "run_federated_poisoning": true,
+    "run_attack_recipe_sweep": true,
+    "attack_recipe_sweep_recipes": [
+      "random_noise",
+      "fgsm_default",
+      "pgd_default"
+    ],
+    "run_malicious_fraction_sweep": true,
+    "run_fast_validation": false,
+    "run_algorithm_comparison": true,
+    "algorithm_comparison_algorithms": [
+      "FedAvg",
+      "FedAdam",
+      "FedAdagrad",
+      "FedYogi",
+      "Scaffold"
+    ],
+    "algorithm_comparison_attack_recipe": "fgsm_default",
+    "malicious_fraction_grid": [
+      0.01,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "poison_demo_recipe": "fgsm_default",
+    "poison_demo_batch_size": 8,
+    "visualize_poison_demo": true,
+    "available_algorithms": [
+      "FedAdagrad",
+      "FedAdam",
+      "FedAvg",
+      "FedYogi",
+      "Scaffold"
+    ],
+    "selected_fed_config_effective": {
+      "fraction_clients": 0.2,
+      "num_clients": 100,
+      "num_rounds": 20,
+      "num_epochs": 2,
+      "batch_size": 64,
+      "global_stepsize": 1.0,
+      "local_stepsize": 0.002,
+      "criterion": "torch.nn.CrossEntropyLoss"
+    },
+    "selected_optim_config_effective": {}
+  },
+  "surrogate_training": {
+    "notebook": "train_surrogate.ipynb",
+    "mode": "centralized",
+    "profile": "tuned_imagenette",
+    "data_view": "client_pool",
+    "client_id": 0,
+    "pool_size": 8,
+    "dataset_path": "./Data/Imagenette",
+    "dataset_name": "Imagenette",
+    "non_iid_per": 0,
+    "selected_profile": "tuned_imagenette"
+  },
+  "surrogate_training_profiles": {
+    "quick": {
+      "description": "Target-aligned MobileNetV2 surrogate smoke test over the configured attacker data view.",
+      "num_epochs": 4,
+      "batch_size": 64,
+      "eval_batch_size": 512,
+      "pretrained": true,
+      "freeze_backbone": false,
+      "augment": false,
+      "use_amp": false,
+      "early_stop_patience": 0,
+      "optimizer": {
+        "name": "sgd",
+        "lr": 0.002,
+        "momentum": 0.0,
+        "weight_decay": 0.0
+      },
+      "scheduler": {
+        "name": "none"
+      },
+      "criterion": {
+        "label_smoothing": 0.0
+      }
+    },
+    "tuned_imagenette": {
+      "description": "Longer target-aligned MobileNetV2 surrogate fine-tuning run.",
+      "num_epochs": 30,
+      "batch_size": 256,
+      "eval_batch_size": 512,
+      "pretrained": true,
+      "freeze_backbone": false,
+      "augment": false,
+      "use_amp": true,
+      "early_stop_patience": 8,
+      "optimizer": {
+        "name": "sgd",
+        "lr": 0.004,
+        "momentum": 0.9,
+        "weight_decay": 4e-05
+      },
+      "scheduler": {
+        "name": "warmup_cosine",
+        "warmup_epochs": 5,
+        "min_lr": 1e-05
+      },
+      "criterion": {
+        "label_smoothing": 0.0
+      }
+    },
+    "attacker_pool": {
+      "description": "Legacy stronger attacker-pool recipe with frozen MobileNetV2 features and augmentation.",
+      "num_epochs": 4,
+      "batch_size": 64,
+      "eval_batch_size": 512,
+      "pretrained": true,
+      "freeze_backbone": true,
+      "augment": true,
+      "use_amp": false,
+      "early_stop_patience": 3,
+      "optimizer": {
+        "name": "adamw",
+        "lr": 0.001,
+        "weight_decay": 0.0001
+      },
+      "scheduler": {
+        "name": "cosine",
+        "min_lr": 1e-05
+      },
+      "criterion": {
+        "label_smoothing": 0.0
+      }
+    }
+  },
+  "model_config": {
+    "module": "model",
+    "name": "MobileNetV3Transfer",
+    "kwargs": {
+      "pretrained": true,
+      "num_classes": 10,
+      "dropout": 0.1
+    }
+  },
+  "algorithms": {
+    "FedAvg": {
+      "fed_config": {
+        "fraction_clients": 0.2,
+        "num_clients": 100,
+        "num_rounds": 20,
+        "num_epochs": 2,
+        "batch_size": 64,
+        "global_stepsize": 1.0,
+        "local_stepsize": 0.002,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "optim_config": {}
+    },
+    "FedAdam": {
+      "fed_config": {
+        "fraction_clients": 0.2,
+        "num_clients": 100,
+        "num_rounds": 20,
+        "num_epochs": 2,
+        "batch_size": 64,
+        "global_stepsize": 0.1,
+        "local_stepsize": 0.002,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "optim_config": {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "epsilon": 1e-06
+      }
+    },
+    "FedAdagrad": {
+      "fed_config": {
+        "fraction_clients": 0.2,
+        "num_clients": 100,
+        "num_rounds": 20,
+        "num_epochs": 2,
+        "batch_size": 64,
+        "global_stepsize": 0.1,
+        "local_stepsize": 0.002,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "optim_config": {
+        "epsilon": 1e-06
+      }
+    },
+    "FedYogi": {
+      "fed_config": {
+        "fraction_clients": 0.2,
+        "num_clients": 100,
+        "num_rounds": 20,
+        "num_epochs": 2,
+        "batch_size": 64,
+        "global_stepsize": 0.1,
+        "local_stepsize": 0.002,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "optim_config": {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "epsilon": 1e-06
+      }
+    },
+    "Scaffold": {
+      "fed_config": {
+        "fraction_clients": 0.2,
+        "num_clients": 100,
+        "num_rounds": 20,
+        "num_epochs": 2,
+        "batch_size": 64,
+        "global_stepsize": 0.1,
+        "local_stepsize": 0.002,
+        "criterion": "torch.nn.CrossEntropyLoss"
+      },
+      "optim_config": {
+        "c_init": 0.0
+      }
+    }
+  },
+  "attack": {
+    "seed": 42,
+    "malicious_fraction": 0.2,
+    "malicious_client_selection": {
+      "mode": "seeded_random",
+      "client_ids": []
+    },
+    "start_round": 3,
+    "attack": {
+      "type": "pgd",
+      "poison_rate": 0.4,
+      "target_label": 0,
+      "epsilon": 0.03137255,
+      "step_size": 0.00784314,
+      "iters": 20,
+      "criterion": "torch.nn.CrossEntropyLoss"
+    },
+    "surrogate": {
+      "checkpoint": "artifacts/module4_surrogate.pt",
+      "checkpoint_source": "train_surrogate.ipynb",
+      "pretrained": false,
+      "finetune_epochs": 0,
+      "local_finetune_epochs": 0,
+      "batch_size": 64,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0,
+      "freeze_backbone": false,
+      "early_stop_patience": 0
+    },
+    "resolved_malicious_client_ids": [
+      7,
+      8,
+      12,
+      17,
+      36,
+      45,
+      47,
+      49,
+      54,
+      61,
+      63,
+      68,
+      71,
+      73,
+      75,
+      83,
+      84,
+      86,
+      89,
+      94
+    ]
+  },
+  "threat_model": {
+    "target_model": "MobileNetV3Transfer",
+    "surrogate_model": "MobileNetV2Transfer",
+    "target_checkpoint_source": "train_v3.ipynb",
+    "surrogate_checkpoint_source": "train_surrogate.ipynb",
+    "clean_and_attacked_fl_initialization": "MobileNetV3Transfer target checkpoint",
+    "poison_generation_gradient_source": "MobileNetV2Transfer surrogate checkpoint",
+    "target_gradients_used_for_poison_generation": false
+  },
+  "surrogate_training_effective": {
+    "description": "Longer target-aligned MobileNetV2 surrogate fine-tuning run.",
+    "num_epochs": 30,
+    "batch_size": 256,
+    "eval_batch_size": 512,
+    "pretrained": true,
+    "freeze_backbone": false,
+    "augment": false,
+    "use_amp": true,
+    "early_stop_patience": 8,
+    "optimizer": {
+      "name": "sgd",
+      "lr": 0.004,
+      "momentum": 0.9,
+      "weight_decay": 4e-05
+    },
+    "scheduler": {
+      "name": "warmup_cosine",
+      "warmup_epochs": 5,
+      "min_lr": 1e-05
+    },
+    "criterion": {
+      "label_smoothing": 0.0
+    },
+    "notebook": "train_surrogate.ipynb",
+    "mode": "centralized",
+    "profile": "tuned_imagenette",
+    "data_view": "client_pool",
+    "client_id": 0,
+    "pool_size": 8,
+    "dataset_path": "./Data/Imagenette",
+    "dataset_name": "Imagenette",
+    "non_iid_per": 0,
+    "learning_rate": 0.004,
+    "lr": 0.004,
+    "weight_decay": 4e-05,
+    "label_smoothing": 0.0
+  },
+  "artifact_paths": {
+    "target_checkpoint_path": "artifacts/module4_v3_target.pt",
+    "surrogate_checkpoint_path": "artifacts/module4_surrogate.pt",
+    "target_summary_path": "artifacts/module4_target_training.json",
+    "surrogate_summary_path": "artifacts/module4_surrogate.json"
+  },
+  "checkpoint_validation": {
+    "target_model": "MobileNetV3Transfer",
+    "target_checkpoint_num_classes": 10,
+    "target_config_num_classes": 10,
+    "surrogate_model": "MobileNetV2Transfer",
+    "surrogate_checkpoint_num_classes": 10,
+    "surrogate_config_num_classes": 10,
+    "target_gradients_used_for_poison_generation": false
+  }
+}
