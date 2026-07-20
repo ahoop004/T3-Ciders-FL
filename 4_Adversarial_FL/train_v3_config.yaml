@@ -34,7 +34,7 @@ target_training:
   # focused attack notebooks.
   mode: "centralized"
   # Options: "quick", "tuned_imagenette", or another key added under target_training_profiles.
-  profile: "quick"
+  profile: "tuned_imagenette"
   # To override one setting without creating a new profile, add the same key here.
   # Example: batch_size: 128
 
@@ -69,8 +69,8 @@ target_training_profiles:
 
   tuned_imagenette:
     description: "Longer MobileNetV3-Small fine-tuning run; reduce batch size if GPU memory is tight."
-    num_epochs: 30
-    batch_size: 256
+    num_epochs: 500
+    batch_size: 64
     eval_batch_size: 512
     # Options: true freezes the MobileNetV3 feature extractor; false fine-tunes all trainable layers.
     freeze_backbone: false
@@ -82,7 +82,7 @@ target_training_profiles:
       # LR scale depends on optimizer: SGD/local_sgd can use larger values;
       # Adam/AdamW fine-tuning usually starts around 0.0001-0.0003.
       name: "sgd"
-      lr: 0.004
+      lr: 0.002
       # Used by SGD/local_sgd only.
       momentum: 0.9
       weight_decay: 0.00004

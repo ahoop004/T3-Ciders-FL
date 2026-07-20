@@ -35,7 +35,7 @@ surrogate_training:
   mode: "centralized"
   # Options: "quick", "tuned_imagenette", "attacker_pool", or another key
   # added under surrogate_training_profiles.
-  profile: "quick"
+  profile: "tuned_imagenette"
   # Options: "client_pool" keeps the attacker limited to pooled client shards;
   # "full_train" intentionally gives the surrogate the full training set.
   data_view: "client_pool"
@@ -87,12 +87,12 @@ surrogate_training_profiles:
 
   tuned_imagenette:
     description: "Longer target-aligned MobileNetV2 surrogate fine-tuning run."
-    num_epochs: 30
-    batch_size: 256
+    num_epochs: 300
+    batch_size: 64
     eval_batch_size: 512
     pretrained: true
     freeze_backbone: false
-    augment: false
+    augment: true
     use_amp: true
     early_stop_patience: 8
     optimizer:
