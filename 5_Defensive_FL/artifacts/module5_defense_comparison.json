@@ -1,0 +1,22 @@
+[
+  {
+    "accuracy_drop": 0.0,
+    "asr": 0.0,
+    "asr_reduction": 100.0,
+    "defense_recovery": 0.356687898089163,
+    "final_accuracy": 74.90445859872611,
+    "rounds": 10,
+    "run": "clean_fedavg",
+    "runtime_sec": 12183.873920877464
+  },
+  {
+    "accuracy_drop": 0.356687898089163,
+    "asr": 100.0,
+    "asr_reduction": 0.0,
+    "defense_recovery": 0.0,
+    "final_accuracy": 74.54777070063695,
+    "rounds": 10,
+    "run": "attacked_fedavg",
+    "runtime_sec": 17394.530355052557
+  }
+]

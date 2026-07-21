@@ -1,0 +1,3 @@
+accuracy_drop,asr,asr_reduction,defense_recovery,final_accuracy,rounds,run,runtime_sec
+0.0,0.0,100.0,0.356687898089163,74.90445859872611,10,clean_fedavg,12183.873920877464
+0.356687898089163,100.0,0.0,0.0,74.54777070063695,10,attacked_fedavg,17394.530355052557
